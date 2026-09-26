@@ -25,7 +25,7 @@ Estado: **base offline/exportación implementada; aceptación integral todavía 
 |---|---|---|
 | Biblioteca, editor, transporte, prompter, diapasón, tab | Soportado por C0–C5; smoke del reproductor en navegador | Setlist de show continúa diferido. |
 | Evaluador — ritmo | Prototipo implementado en C6 | No se midió latencia ni sangrado de parlantes; métrica no certificada para interpretación. |
-| Evaluador — notas del acorde | No disponible | C8 no está implementado. |
+| Evaluador — notas del acorde | Helper puro disponible en C8 | No hay croma del micrófono en vivo ni integración en el evaluador. |
 | Evaluador — afinación en solos | No disponible | C8 no está implementado y no hay precisión validada. |
 | Borrador desde audio — BPM | Prototipo local; tempo sintético de 120 BPM estimado cerca de 120 | Requiere corregir y declarar revisado manualmente. |
 | Borrador desde audio — acordes | Experimental; no soportado como transcripción final | Falló la progresión sintética C–G–F–C; las sugerencias se deben corregir. |
