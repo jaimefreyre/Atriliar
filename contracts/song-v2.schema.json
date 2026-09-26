@@ -108,9 +108,10 @@
         },
         "method": {
           "enum": [
-            "grid",
-            "manual",
-            "aligned"
+          "grid",
+          "manual",
+          "aligned",
+          "auto-analyzed"
           ]
         },
         "notes": {

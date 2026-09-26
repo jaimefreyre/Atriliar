@@ -5,6 +5,7 @@ import { importSongV2Document } from './data/importSongV2.js';
 import { askCollision, promptBarsPerLine, showInfo } from './ui/importDialog.js';
 import { openCalibrationEditor } from './ui/calibrationEditor.js';
 import { openPlayerView } from './ui/playerView.js';
+import { openAudioDraftAssistant } from './ui/audioDraftAssistant.js';
 import { exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
 
 window.addEventListener('stageprompter:db', (e) => {
@@ -161,6 +162,10 @@ document.getElementById('btn-new').addEventListener('click', async () => {
     reviewWarnings: [],
   };
   await openCalibrationEditor(blank, loadLibrary);
+});
+
+document.getElementById('btn-audio-draft').addEventListener('click', () => {
+  openAudioDraftAssistant({ onClose: loadLibrary });
 });
 
 const btnImport = document.getElementById('btn-import');

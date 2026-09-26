@@ -12,12 +12,13 @@
 <body>
   <main>
     <h1>Spike técnico · análisis en Worker</h1>
-    <p>Carga la librería desde disco en un Worker de módulo, comprueba la versión WASM, tempo y onsets. La aplicación principal nunca importa Essentia estáticamente.</p>
+    <p>Carga la librería desde disco en un Worker de módulo, comprueba tempo, onsets y acordes tentativos por croma. La aplicación principal nunca importa Essentia estáticamente.</p>
     <section class="spike-panel">
       <label>Audio local <input id="file" type="file" accept="audio/*"></label>
-      <button type="button" id="fixture">Generar tono de prueba local · 120 BPM</button>
+      <button type="button" id="fixture">Generar progresión sintética local · 120 BPM</button>
       <button type="button" id="analyse" disabled>Analizar en el Worker</button>
-      <div class="spike-results"><p>Tempo detectado: <strong id="bpm">—</strong></p><p>Beats/onsets: <strong id="count">—</strong></p></div>
+      <div class="spike-results"><p>Tempo detectado: <strong id="bpm">—</strong></p><p>Beats/onsets/acordes: <strong id="count">—</strong></p></div>
+      <pre class="status" id="chords" aria-label="Acordes candidatos">Sin acordes analizados.</pre>
       <pre class="status" id="status" role="status" aria-live="polite">Esperando archivo de audio de prueba.</pre>
     </section>
     <p class="limitation">Los estímulos sintéticos miden que el módulo funciona y reconocen un caso controlado; no validan música compleja ni rendimiento con todos los formatos. Este arnés no activa el micrófono.</p>
@@ -29,20 +30,21 @@
     let worker = null;
     function makeClickFixture() {
       const rate = 44100, seconds = 16, pcm = new Float32Array(rate * seconds);
+      const progression = [[130.81,164.81,196.00],[98.00,123.47,146.83],[87.31,110.00,130.81],[130.81,164.81,196.00]];
       for (let beat = 0; beat < seconds * 2; beat++) {
         const start = Math.round(beat * rate * 0.5);
-        for (let i = 0; i < Math.min(3500, pcm.length - start); i++) {
-          const env = Math.exp(-i / 520);
-          const freq = beat % 2 === 0 ? 88 : 740;
-          pcm[start + i] += Math.sin(2 * Math.PI * freq * i / rate) * env * 0.72;
+        const chord = progression[Math.floor(beat / 8) % progression.length];
+        for (let i = 0; i < Math.min(20000, pcm.length - start); i++) {
+          const env = Math.exp(-i / 9000);
+          for (const freq of chord) pcm[start + i] += Math.sin(2 * Math.PI * freq * i / rate) * env * 0.18;
         }
       }
       return { pcm, sampleRate: rate };
     }
     $('fixture').addEventListener('click', () => {
       sample = makeClickFixture(); $('analyse').disabled = false;
-      $('status').textContent = 'Fixture sintético: 16 s, 120 BPM, 32 ataques. Listo para analizar.';
-      $('bpm').textContent = '—'; $('count').textContent = '—';
+      $('status').textContent = 'Fixture sintético: 16 s, 120 BPM, progresión C · G · F · C y 32 ataques.';
+      $('bpm').textContent = '—'; $('count').textContent = '—'; $('chords').textContent = 'Sin acordes analizados.';
     });
     $('file').addEventListener('change', async (event) => {
       const file = event.target.files?.[0]; if (!file) return;
@@ -67,7 +69,7 @@
       worker.onmessage = ({ data }) => {
         if (data.type === 'ready') { $('status').textContent = `Worker listo · Essentia ${data.version} · RhythmExtractor2013=${data.rhythm} · OnsetRate=${data.onsets}. Analizando…`; worker.postMessage({ ...sample, type: 'analyse' }, [sample.pcm.buffer]); }
         else if (data.type === 'warning') $('status').textContent += `\n${data.message}`;
-        else if (data.type === 'analysis') { $('bpm').textContent = `${data.bpm.toFixed(1)} BPM`; $('count').textContent = `${data.beats.length} beats / ${data.onsets.length} onsets`; $('status').textContent = `Terminado · Essentia ${data.version} · confianza ${data.rhythmConfidence.toFixed(3)} · onset rate ${data.onsetRate.toFixed(2)} por segundo. PCM ${data.sampleRate} Hz.`; worker.terminate(); worker = null; }
+        else if (data.type === 'analysis') { $('bpm').textContent = `${data.bpm.toFixed(1)} BPM`; $('count').textContent = `${data.beats.length} / ${data.onsets.length} / ${data.chordSuggestions.length}`; $('chords').textContent = data.chordCandidates.map(chord => `${(chord.startMs/1000).toFixed(1)}–${(chord.endMs/1000).toFixed(1)} s · ${chord.symbol} · ${chord.accepted ? 'aceptado' : 'dudoso'} · score ${chord.confidence.toFixed(2)} · margen ${(chord.margin ?? 0).toFixed(2)}`).join('\n') || 'Sin intervalos evaluables.'; $('status').textContent = `Terminado · Essentia ${data.version} · confianza ${data.rhythmConfidence.toFixed(3)} (no es porcentaje) · onset rate ${data.onsetRate.toFixed(2)} por segundo. PCM ${data.sampleRate} Hz.`; worker.terminate(); worker = null; }
         else if (data.type === 'error') { $('status').textContent = `Error del Worker:\n${data.message}`; worker.terminate(); worker = null; }
       };
       worker.onerror = (error) => { $('status').textContent = `No se pudo iniciar el Worker: ${error.message}`; };

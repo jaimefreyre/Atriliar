@@ -1,3 +1,5 @@
+import { matchChordTemplate } from './chordTemplateMatch.js';
+
 let instance = null;
 
 async function loadEssentia() {
@@ -29,6 +31,57 @@ function resampleTo44100(signal, sourceRate) {
   return output;
 }
 
+function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs, bpm) {
+  const beatPeriodSec = 60 / bpm;
+  const beatSeconds = [...detectedBeatSeconds];
+  if (beatSeconds.length && beatSeconds[0] > beatPeriodSec * 0.5 && beatSeconds[0] <= beatPeriodSec * 1.5) {
+    beatSeconds.unshift(Math.max(0, beatSeconds[0] - beatPeriodSec));
+  }
+  if (beatSeconds.length && beatSeconds.at(-1) + beatPeriodSec < durationMs / 1000 + 0.02) {
+    beatSeconds.push(Math.min(durationMs / 1000, beatSeconds.at(-1) + beatPeriodSec));
+  }
+  const frameSize = 4096;
+  const hopSize = 2048;
+  const chromaFrames = [];
+  for (let offset = 0; offset + frameSize <= pcm44100.length; offset += hopSize) {
+    const startSec = (offset + frameSize / 2) / 44100;
+    const frame = essentia.arrayToVector(pcm44100.slice(offset, offset + frameSize));
+    let windowed, spectrum, peaks, hpcp;
+    try {
+      windowed = essentia.Windowing(frame, true, frameSize, 'hann', 0, true);
+      spectrum = essentia.Spectrum(windowed.frame, frameSize);
+      peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.0001, 5000, 100, 55, 'frequency', 44100);
+      hpcp = essentia.HPCP(peaks.frequencies, peaks.magnitudes);
+      // Essentia HPCP bins are A..G#; the application contract uses C..B.
+      const fromA = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
+      const cMajorOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => fromA[index] || 0);
+      chromaFrames.push({ timeSec: startSec, chroma: cMajorOrder });
+    } finally {
+      hpcp?.hpcp?.delete?.(); peaks?.frequencies?.delete?.(); peaks?.magnitudes?.delete?.();
+      spectrum?.spectrum?.delete?.(); windowed?.frame?.delete?.(); frame?.delete?.();
+    }
+  }
+
+  const events = [];
+  const candidates = [];
+  for (let index = 0; index + 1 < beatSeconds.length; index++) {
+    const startSec = beatSeconds[index];
+    const endSec = beatSeconds[index + 1];
+    if (!(endSec > startSec)) continue;
+    const frames = chromaFrames.filter((frame) => frame.timeSec >= startSec && frame.timeSec < endSec);
+    if (!frames.length) continue;
+    const chroma = Array.from({ length: 12 }, (_, pitch) =>
+      frames.reduce((sum, frame) => sum + frame.chroma[pitch], 0) / frames.length);
+    const guess = matchChordTemplate(chroma, { minScore: 0.65, minMargin: 0.08 });
+    const candidate = { symbol: guess.symbol, startMs: Math.max(0, Math.round(startSec * 1000)),
+      endMs: Math.min(durationMs, Math.round(endSec * 1000)), confidence: guess.score, margin: guess.margin,
+      accepted: guess.accepted };
+    candidates.push(candidate);
+    if (guess.accepted) events.push(candidate);
+  }
+  return { events, candidates };
+}
+
 self.onmessage = async ({ data }) => {
   try {
     if (data.type === 'init') {
@@ -54,9 +107,15 @@ self.onmessage = async ({ data }) => {
       } catch (error) {
         self.postMessage({ type: 'warning', message: `OnsetRate no disponible: ${error.message}` });
       }
+      let chordSuggestions = [], chordCandidates = [];
+      try {
+        ({ events: chordSuggestions, candidates: chordCandidates } = estimateChordEvents(essentia, pcm44100, beats,
+          Math.round(pcm44100.length / 44100 * 1000), Number(rhythm.bpm)));
+      }
+      catch (error) { self.postMessage({ type: 'warning', message: `Análisis de acordes no disponible: ${error.message}` }); }
       self.postMessage({ type: 'analysis', version: essentia.version, sampleRate: 44100,
         durationMs: Math.round(pcm44100.length / 44100 * 1000), bpm: Number(rhythm.bpm),
-        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate });
+        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates });
       rhythm.ticks?.delete?.(); rhythm.bpmIntervals?.delete?.(); rhythm.estimates?.delete?.();
     } finally {
       signal?.delete?.();

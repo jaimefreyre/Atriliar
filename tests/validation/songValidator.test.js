@@ -16,6 +16,13 @@ test('la demo oficial pasa validateSongV2 sin errores', () => {
   assert.equal(valid, true, JSON.stringify(errors));
 });
 
+test('un borrador autoanalizado se mantiene en v2 como estimado', () => {
+  const draft = loadDemo();
+  draft.timing = { status: 'estimated', method: 'auto-analyzed', notes: 'Estimación inicial; requiere revisión.' };
+  const { valid, errors } = validateSongV2(draft);
+  assert.equal(valid, true, JSON.stringify(errors));
+});
+
 test('un campo extra se rechaza', () => {
   const demo = loadDemo();
   demo.notAField = true;

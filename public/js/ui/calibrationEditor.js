@@ -506,6 +506,14 @@ function render() {
   const wrap = el('div', { style: 'padding:20px;max-width:960px;margin:0 auto;color:#111' });
 
   renderHeader(wrap);
+  if (state.song.reviewWarnings?.length) {
+    const warnings = el('aside', { className: 'audio-draft-review-warnings', 'aria-label': 'Advertencias del borrador' });
+    warnings.appendChild(el('strong', {}, ['Revisión necesaria antes de declarar esta canción revisada:']));
+    const list = el('ul');
+    state.song.reviewWarnings.forEach((warning) => list.appendChild(el('li', {}, [warning])));
+    warnings.appendChild(list);
+    wrap.appendChild(warnings);
+  }
   wrap.appendChild(el('div', { id: 'calib-transport-bar', style: 'margin:12px 0;padding:10px;background:#f3f4f6;border-radius:8px' }));
   renderTabBar(wrap);
 

@@ -25,7 +25,7 @@ Estado: especificación para construir; no cambia el runtime existente. La forma
 | `metadata.timeSignature` | Objeto `{numerator, denominator}`. El denominador es 1, 2, 4, 8, 16 o 32. |
 | `durationMs` | Duración musical positiva de la canción, sin contar un count-in opcional de la interfaz. |
 | `timing.status` | `estimated` mientras la temporización no fue revisada por una persona; `reviewed` solo tras revisión explícita. No certifica toda la teoría musical del documento. |
-| `timing.method` | `grid` para una distribución según compases; `manual` para marcas humanas; `aligned` para un proceso de alineación real con evidencia temporal. |
+| `timing.method` | `grid` para una distribución según compases; `manual` para marcas humanas; `aligned` para un proceso de alineación real con evidencia temporal; `auto-analyzed` para una primera estimación derivada de análisis de audio y todavía no revisada. |
 | `timing.notes` | Supuestos y limitaciones de temporización. Puede estar vacío si no hay nada que aclarar. |
 | `audio` | `null` para base genérica, o `{assetId, offsetMs}` para un Blob local guardado por separado. No contiene URL remota ni ruta absoluta del equipo. |
 | `sections[]` | `{id,type,label,key,startMs,endMs}`. `key` string usa la misma notación tonal de metadata; `null` hereda `metadata.key` y nunca hereda accidentalmente la sección anterior. Tipos cerrados: `intro`, `verse`, `prechorus`, `chorus`, `bridge`, `solo`, `instrumental`, `outro`, `other`. Las repeticiones se expanden con IDs distintos. |
@@ -41,6 +41,10 @@ Estado: especificación para construir; no cambia el runtime existente. La forma
 | `reviewWarnings[]` | Advertencias legibles y específicas, sin duplicados. No sustituye errores estructurales ni permite importar datos inválidos. |
 
 Todos los objetos tienen `additionalProperties: false`. Todos sus campos definidos son obligatorios; la ausencia de datos se expresa con `null`, `[]` o la cadena vacía únicamente donde el esquema lo permite. Esto evita variantes incompatibles como `bpm: "120"`, `originalKey` dentro de v2 o `timeSignature: "4/4"`.
+
+### Historial de cambios del contrato
+
+- **v2 additive — `auto-analyzed`:** habilita borradores cuyos BPM, pulsos o acordes iniciales se estimaron desde un archivo de audio. Mantiene `timing.status: "estimated"`; no implica alineación exacta ni revisión musical.
 
 ## Validación semántica obligatoria
 

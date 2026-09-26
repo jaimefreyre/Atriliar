@@ -7,7 +7,7 @@
  * ESPECIFICACION.md REQ-01).
  */
 
-import { getSongV2, saveSongV2 } from './indexedDb.js';
+import { getSongV2, saveSongV2, saveSongV2WithAsset } from './indexedDb.js';
 import { validateSongV2 } from './songValidator.js';
 
 const MAX_ID_LENGTH = 100;
@@ -25,9 +25,12 @@ function makeDuplicateId(originalId) {
  *   IndexedDB write transaction open (a UI prompt is fine).
  * @returns {Promise<{status: 'invalid', errors: object[]} | {status: 'cancelled'} | {status: 'created'|'replaced'|'duplicated', id: string}>}
  */
-export async function importSongV2Document(doc, onCollision) {
+export async function importSongV2Document(doc, onCollision, asset = null) {
   const { valid, errors } = validateSongV2(doc);
   if (!valid) return { status: 'invalid', errors };
+  if (asset && doc.audio?.assetId !== asset.id) {
+    return { status: 'invalid', errors: [{ instancePath: '/audio/assetId', message: 'El asset local debe coincidir con audio.assetId.' }] };
+  }
 
   const existing = await getSongV2(doc.id);
   let toSave = doc;
@@ -48,7 +51,8 @@ export async function importSongV2Document(doc, onCollision) {
     }
   }
 
-  await saveSongV2(toSave);
+  if (asset) await saveSongV2WithAsset(toSave, asset);
+  else await saveSongV2(toSave);
   return { status, id: toSave.id };
 }
 
