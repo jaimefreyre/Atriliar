@@ -28,6 +28,16 @@ Once checkpoints (C0–C10), cada uno el "vertical slice" demostrable que pide `
 
 **Dependencias del proyecto — antes del pivot:** `ajv` (validación) + `esbuild` (solo como `devDependency`, para aplanar el validador generado a un archivo ESM sin imports en tiempo de ejecución — ver C1). Sin framework, sin bundler para el resto del frontend, sin backend con estado.
 
+### Estado de ejecución post-pivot (2026-09-26)
+
+| Checkpoint | Estado | Evidencia o condición abierta |
+|---|---|---|
+| C6 | Implementado; criterio acústico abierto | [POST-PIVOT-C6-EVIDENCIA.md](POST-PIVOT-C6-EVIDENCIA.md): falta medir micrófono/latencia/contaminación en un navegador con permiso resuelto. |
+| C7 | Flujo implementado; análisis armónico experimental | [POST-PIVOT-C7-EVIDENCIA.md](POST-PIVOT-C7-EVIDENCIA.md): BPM sintético razonable; progresión de acordes no fiable y no se probó audio musical real. |
+| C8 | No implementado | Las capas de notas/afinación no se presentan hasta completar C6 y validar el análisis de C7. |
+| C9 | Completo | [POST-PIVOT-C9-EVIDENCIA.md](POST-PIVOT-C9-EVIDENCIA.md): fullscreen/Wake Lock y teclado comprobados en el navegador integrado. |
+| C10 | Base implementada; aceptación offline incompleta | [POST-PIVOT-C10-EVIDENCIA.md](POST-PIVOT-C10-EVIDENCIA.md): faltan prueba sin servidor/red y evidencia final global. |
+
 **Dependencias nuevas que agrega el pivot (única vez que esto cambia en todo el proyecto):** `essentia.js` (MTG-UPF, WASM, npm real) para todo el análisis de audio (croma/HPCP, tempo/beat, onsets, acorde por tríada, altura monofónica) — ver C6/C7/C8. Opcionalmente `whisper.cpp` compilado a WASM (o un envoltorio equivalente) solo para el estiramiento de letra palabra-a-palabra dentro de C7. Ambas se auto-alojan en `public/` (nunca CDN en tiempo de ejecución, para no romper el modo sin conexión) y se cargan de forma perezosa (`import()` dinámico dentro de un Worker, jamás un import estático en un módulo del núcleo) — quien nunca abre el asistente de carga o el evaluador no descarga nada de esto. Detalle de empaquetado exacto en C6.
 
 **Pruebas:** `node:test` (nativo, cero dependencias) para toda la lógica pura (música, timeline, validación) importando los módulos de producción, nunca copias — esto corrige la limitación conocida de `tests/musicEngine.test.js`. Para "automatización de navegador" (importación, persistencia, audio, UI) uso el navegador integrado de esta sesión para ejecutar el flujo real contra el servidor local y reportar evidencia (no se agrega Playwright/Cypress al repo; si se quiere esa suite committeada más adelante, se decide en C10). Para los spikes técnicos de más riesgo (C6, C7) uso el mismo patrón ya establecido de un arnés de depuración en `public/debug/*.html` (como el existente `transport-harness.html`).

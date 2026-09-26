@@ -1,5 +1,7 @@
 ﻿import { getAllSongs, saveSong, deleteSong, getAllSongsV2, deleteSongV2, getSongV2 } from './data/indexedDb.js';
 import { validateSong, detectSongFormat } from './data/songValidator.js';
+import { buildBackup, isBackupDocument } from './data/backup.js';
+import { initializeOffline } from './data/offline.js';
 import { migrateLegacySong } from './data/legacyImporter.js';
 import { importSongV2Document } from './data/importSongV2.js';
 import { askCollision, promptBarsPerLine, showInfo } from './ui/importDialog.js';
@@ -168,6 +170,17 @@ document.getElementById('btn-audio-draft').addEventListener('click', () => {
   openAudioDraftAssistant({ onClose: loadLibrary });
 });
 
+document.getElementById('btn-export-backup').addEventListener('click', async () => {
+  const backup = buildBackup({ legacySongs: await getAllSongs(), songsV2: await getAllSongsV2() });
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `stageprompter-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
 const btnImport = document.getElementById('btn-import');
 const fileInput = document.getElementById('file-input');
 
@@ -239,6 +252,36 @@ fileInput.addEventListener('change', async (e) => {
 
   const format = detectSongFormat(raw);
 
+  if (isBackupDocument(raw)) {
+    let imported = 0; let skipped = 0; let invalid = 0;
+    for (const doc of raw.songsV2) {
+      const result = await importSongV2Document(doc, askCollision);
+      if (result.status === 'created' || result.status === 'replaced' || result.status === 'duplicated') imported++;
+      else if (result.status === 'invalid') invalid++;
+      else skipped++;
+    }
+    for (const original of raw.legacySongs) {
+      const legacy = structuredClone(original);
+      const validation = validateSong(legacy);
+      if (!validation.valid) { invalid++; continue; }
+      const existing = (await getAllSongs()).find((song) => song.id === legacy.id);
+      if (existing) {
+        const choice = await askCollision(existing, legacy);
+        if (choice === 'cancel') { skipped++; continue; }
+        if (choice === 'duplicate') legacy.id = `${legacy.id.slice(0, 75)}-copy-${Date.now().toString(36)}`;
+      }
+      await saveSong(legacy);
+      imported++;
+    }
+    await showInfo('Respaldo procesado', [
+      `Canciones importadas: ${imported}`, `Omitidas: ${skipped}`, `Inválidas: ${invalid}`,
+      'El JSON no contiene audio. Las canciones que lo referencian necesitan volver a vincular el archivo.',
+    ]);
+    await loadLibrary();
+    e.target.value = '';
+    return;
+  }
+
   if (format === 'v2') {
     const result = await importSongV2Document(raw, askCollision);
     if (result.status === 'invalid') {
@@ -270,3 +313,7 @@ fileInput.addEventListener('change', async (e) => {
 });
 
 loadLibrary();
+initializeOffline((message) => {
+  const status = document.getElementById('storage-status');
+  if (status) status.textContent = message;
+});

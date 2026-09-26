@@ -3,6 +3,7 @@ import { buildAudioDraft } from '../audio/draftBuilder.js';
 import { importSongV2Document } from '../data/importSongV2.js';
 import { getSongV2 } from '../data/indexedDb.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
+import { cacheOptionalAudioTools } from '../data/offline.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -25,6 +26,7 @@ function createAssetId() {
 /** Local-only optional assistant. All audio analysis happens in its module Worker. */
 export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   if (document.getElementById('audio-draft-assistant')) return;
+  cacheOptionalAudioTools().catch(() => {});
   let selectedFile = null;
   let decoded = null;
   let analysis = null;

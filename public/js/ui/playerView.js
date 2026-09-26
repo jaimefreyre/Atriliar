@@ -7,6 +7,7 @@
  */
 
 import { getAsset } from '../data/indexedDb.js';
+import { cacheSongAudioAsset } from '../data/offline.js';
 import { isLocallyReviewed } from '../data/reviewState.js';
 import { createTransport } from '../transport/transport.js';
 import { createAudioTrackAdapter } from '../transport/audioTrack.js';
@@ -41,6 +42,7 @@ async function buildTransport(song) {
   if (song.audio) {
     const asset = await getAsset(song.audio.assetId);
     if (asset) {
+      cacheSongAudioAsset(asset).catch(() => {});
       const adapter = createAudioTrackAdapter({ blob: asset.blob, offsetMs: song.audio.offsetMs, volume: 1 });
       return { transport: createTransport({ mode: 'audio', durationMs: song.durationMs, adapter }), fallback: false };
     }

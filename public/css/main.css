@@ -149,6 +149,8 @@ main { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
 
 .help-text { font-size: 0.85em; color: #6b7280; background: #f3f4f6; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
 
+.storage-status { margin: 10px 0 18px; color: #526259; font-size: 0.85em; }
+
 /* ===== CALIBRACIÓN (C3) ===== */
 #calibration-view { background: #f4f4f9; min-height: 100vh; }
 #calibration-view table th, #calibration-view table td {
