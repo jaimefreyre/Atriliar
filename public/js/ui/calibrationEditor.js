@@ -14,26 +14,13 @@ import { markReviewed, isLocallyReviewed } from '../data/reviewState.js';
 import { createTransport } from '../transport/transport.js';
 import { createAudioTrackAdapter, checkAudioCoversRange } from '../transport/audioTrack.js';
 import { createManualAdapter } from '../transport/manual.js';
+import { el } from './dom.js';
 
 /** @type {{song: object, transport: object, pendingBlob: Blob|null, pendingAssetMeta: object|null, loopA: number|null, loopB: number|null, loopEnabled: boolean, onClose: Function|null}|null} */
 let state = null;
 // El adapter no forma parte del contrato del transporte; se guarda la
 // referencia acá para poder llamar setVolume/setMuted directo sobre él.
 let currentAdapterRef = null;
-
-function el(tag, props = {}, children = []) {
-  const node = document.createElement(tag);
-  Object.entries(props).forEach(([key, value]) => {
-    if (key === 'className') node.className = value;
-    else if (key === 'onclick') node.onclick = value;
-    else if (key === 'onchange') node.onchange = value;
-    else if (key === 'oninput') node.oninput = value;
-    else if (key === 'style') node.style.cssText = value;
-    else node.setAttribute(key, value);
-  });
-  children.forEach((child) => node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child));
-  return node;
-}
 
 function fmtMs(ms) {
   const s = Math.floor(ms / 1000);

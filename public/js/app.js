@@ -4,6 +4,7 @@ import { migrateLegacySong } from './data/legacyImporter.js';
 import { importSongV2Document } from './data/importSongV2.js';
 import { askCollision, promptBarsPerLine, showInfo } from './ui/importDialog.js';
 import { openCalibrationEditor } from './ui/calibrationEditor.js';
+import { openPlayerView } from './ui/playerView.js';
 import { enterStageMode, exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
 
 window.addEventListener('stageprompter:db', (e) => {
@@ -82,14 +83,15 @@ function renderV2SongItem(song) {
   info.appendChild(buildBadge(`${song.metadata.bpm} BPM`));
   info.appendChild(buildBadge(song.timing.status === 'reviewed' ? 'Revisada' : 'Estimada'));
   const note = document.createElement('span');
-  note.textContent = 'El modo escenario v2 todavía no está conectado en esta versión.';
+  note.textContent = 'Modo escenario completo (setlist, pedal, pantalla completa) todavía no conectado.';
   note.style.cssText = 'font-size:0.85em;color:#6b7280;';
   info.appendChild(note);
   div.appendChild(info);
 
   const actions = document.createElement('div');
   actions.className = 'song-actions';
-  actions.appendChild(buildActionButton('🎚️ CALIBRAR', 'calibrate-v2', song.id, 'btn-stage'));
+  actions.appendChild(buildActionButton('▶ REPRODUCIR', 'play-v2', song.id, 'btn-stage'));
+  actions.appendChild(buildActionButton('🎚️ CALIBRAR', 'calibrate-v2', song.id));
   actions.appendChild(buildActionButton('🗑️', 'delete-v2', song.id, 'btn-danger'));
   div.appendChild(actions);
   return div;
@@ -128,6 +130,9 @@ async function loadLibrary() {
     } else if (action === 'calibrate-v2') {
       const song = songsV2.find(s => s.id === id);
       if (song) await openCalibrationEditor(song, loadLibrary);
+    } else if (action === 'play-v2') {
+      const song = songsV2.find(s => s.id === id);
+      if (song) await openPlayerView(song, loadLibrary);
     } else if (action === 'stage') {
       const song = songs.find(s => s.id === id);
       if (song) {
