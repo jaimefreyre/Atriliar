@@ -19,6 +19,7 @@
  *   onSeek?(songMs)      — reposition it
  *   onDispose?()         — full teardown
  *   setErrorHandler?(fn) — adapter calls fn(message) if it hits a real error (C3's audio adapter)
+ *   supportsRateChange?  — false blocks setRate() even while paused (real audio is always rate 1)
  *
  * @typedef {'idle'|'loading'|'ready'|'playing'|'paused'|'ended'|'error'} TransportState
  * @typedef {'audio'|'generated'|'manual'} TransportMode
@@ -115,9 +116,14 @@ export function createTransport({ mode, durationMs, adapter }) {
     notify();
   }
 
-  /** El BPM/tempo solo se cambia en pausa; devuelve false si se rechazó. */
+  /**
+   * El BPM/tempo solo se cambia en pausa, y solo si el modo lo admite (el
+   * audio real siempre reproduce a velocidad 1 — adapter.supportsRateChange
+   * === false lo bloquea también en pausa). Devuelve false si se rechazó.
+   */
   function setRate(newRate) {
     if (disposed || state === 'playing') return false;
+    if (adapter.supportsRateChange === false) return false;
     rate = newRate;
     notify();
     return true;

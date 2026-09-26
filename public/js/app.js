@@ -3,6 +3,7 @@ import { validateSong, detectSongFormat } from './data/songValidator.js';
 import { migrateLegacySong } from './data/legacyImporter.js';
 import { importSongV2Document } from './data/importSongV2.js';
 import { askCollision, promptBarsPerLine, showInfo } from './ui/importDialog.js';
+import { openCalibrationEditor } from './ui/calibrationEditor.js';
 import { enterStageMode, exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
 
 window.addEventListener('stageprompter:db', (e) => {
@@ -81,13 +82,14 @@ function renderV2SongItem(song) {
   info.appendChild(buildBadge(`${song.metadata.bpm} BPM`));
   info.appendChild(buildBadge(song.timing.status === 'reviewed' ? 'Revisada' : 'Estimada'));
   const note = document.createElement('span');
-  note.textContent = 'Reproducción y edición v2 todavía no están conectadas en esta versión.';
+  note.textContent = 'El modo escenario v2 todavía no está conectado en esta versión.';
   note.style.cssText = 'font-size:0.85em;color:#6b7280;';
   info.appendChild(note);
   div.appendChild(info);
 
   const actions = document.createElement('div');
   actions.className = 'song-actions';
+  actions.appendChild(buildActionButton('🎚️ CALIBRAR', 'calibrate-v2', song.id, 'btn-stage'));
   actions.appendChild(buildActionButton('🗑️', 'delete-v2', song.id, 'btn-danger'));
   div.appendChild(actions);
   return div;
@@ -123,6 +125,9 @@ async function loadLibrary() {
       if (confirm('¿Eliminar esta canción?')) { await deleteSong(id); loadLibrary(); }
     } else if (action === 'delete-v2') {
       if (confirm('¿Eliminar esta canción v2?')) { await deleteSongV2(id); loadLibrary(); }
+    } else if (action === 'calibrate-v2') {
+      const song = songsV2.find(s => s.id === id);
+      if (song) await openCalibrationEditor(song, loadLibrary);
     } else if (action === 'stage') {
       const song = songs.find(s => s.id === id);
       if (song) {

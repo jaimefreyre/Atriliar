@@ -79,6 +79,23 @@ function runInStore(storeName, mode, fn) {
   }));
 }
 
+/**
+ * Como runInStore, pero para una escritura que abarca varios stores en UNA
+ * sola transacción (p.ej. la canción y el asset de audio que referencia:
+ * ninguna de las dos partes se guarda sin la otra). `writes` recibe el
+ * mapa {storeName: IDBObjectStore} y no debe hacer ningún await.
+ */
+function runInStores(storeNames, mode, writes) {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(storeNames, mode);
+    const stores = Object.fromEntries(storeNames.map((name) => [name, tx.objectStore(name)]));
+    writes(stores);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new DOMException('Transacción abortada', 'AbortError'));
+  }));
+}
+
 // --- v1 legacy (sin cambios de comportamiento) ---
 
 export async function getAllSongs() {
@@ -105,6 +122,29 @@ export async function saveSongV2(song) {
 }
 export async function deleteSongV2(id) {
   return runInStore(STORE_SONGS_V2, 'readwrite', s => s.delete(id));
+}
+
+/**
+ * Guarda la canción y su asset de audio en una única transacción atómica:
+ * si falla cualquiera de las dos escrituras, ninguna queda comprometida
+ * (nunca una canción referenciando un asset a medio guardar).
+ * @param {object} song documento v2 ya validado, con `audio.assetId === asset.id`
+ * @param {{id:string, blob:Blob, name:string, mime:string, bytes:number, duration:number}} asset
+ */
+export async function saveSongV2WithAsset(song, asset) {
+  return runInStores([STORE_SONGS_V2, STORE_ASSETS], 'readwrite', (stores) => {
+    stores[STORE_SONGS_V2].put(song);
+    stores[STORE_ASSETS].put(asset);
+  });
+}
+
+// --- assets (blobs de audio) ---
+
+export async function getAsset(id) {
+  return runInStore(STORE_ASSETS, 'readonly', s => s.get(id));
+}
+export async function deleteAsset(id) {
+  return runInStore(STORE_ASSETS, 'readwrite', s => s.delete(id));
 }
 
 // --- settings (preferencias, y hash de revisión local `review:<songId>`) ---

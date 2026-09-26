@@ -148,3 +148,10 @@ main { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
 }
 
 .help-text { font-size: 0.85em; color: #6b7280; background: #f3f4f6; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+
+/* ===== CALIBRACIÓN (C3) ===== */
+#calibration-view { background: #f4f4f9; min-height: 100vh; }
+#calibration-view table th, #calibration-view table td {
+  border: 1px solid #e5e7eb; padding: 6px 8px; text-align: left; vertical-align: middle;
+}
+#calibration-view table th { background: #f9fafb; }
