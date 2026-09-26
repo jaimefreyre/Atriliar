@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StagePrompter Pro</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/stage.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🎸 STAGE PROMPTER <span class="version">PRO</span></h1>
+    </header>
+    <main id="library-view">
+      <div class="actions">
+        <button id="btn-import" class="btn-primary">📥 IMPORTAR</button>
+        <button id="btn-new" class="btn-secondary">➕ NUEVA</button>
+        <input type="file" id="file-input" accept=".json" style="display:none">
+      </div>
+      <h2> MIS CANCIONES</h2>
+      <div id="song-list" class="song-list"></div>
+    </main>
+  </div>
+
+  <div id="editor-modal" class="modal">
+    <div class="modal-content modal-large">
+      <button class="modal-close">&times;</button>
+      <h2 id="editor-title">Editar Canción</h2>
+      <div class="editor-tabs">
+        <button class="editor-tab active" data-tab="metadata">📋 Metadatos</button>
+        <button class="editor-tab" data-tab="structure">🎵 Estructura</button>
+      </div>
+      <div class="editor-content">
+        <div id="tab-metadata" class="editor-panel active">
+          <div class="form-group"><label>Título:</label><input type="text" id="edit-title" class="form-input"></div>
+          <div class="form-group"><label>Artista:</label><input type="text" id="edit-artist" class="form-input"></div>
+          <div class="form-row">
+            <div class="form-group"><label>Tonalidad:</label><select id="edit-key" class="form-input"><option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option><option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option></select></div>
+            <div class="form-group"><label>BPM:</label><input type="number" id="edit-bpm" class="form-input" min="40" max="240"></div>
+          </div>
+          <div class="form-group"><label>YouTube Studio:</label><input type="url" id="edit-youtube-studio" class="form-input"></div>
+          <div class="form-group"><label>YouTube Live:</label><input type="url" id="edit-youtube-live" class="form-input"></div>
+        </div>
+        <div id="tab-structure" class="editor-panel">
+          <div id="sections-editor"></div>
+          <button id="btn-add-section" class="btn-small">+ Agregar Sección</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-save-song" class="btn-primary">💾 GUARDAR</button>
+        <button id="btn-cancel-edit" class="btn-secondary">CANCELAR</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stage-container">
+    <!-- Header con botones de toggle -->
+    <div id="stage-header">
+      <div class="header-left">
+        <h1 id="stage-song-title">-</h1>
+        <div class="stage-meta">
+          <span id="stage-artist">-</span>
+          <span class="sep">|</span>
+          <span id="stage-key">-</span>
+          <span class="sep">|</span>
+          <span id="stage-bpm">- BPM</span>
+        </div>
+      </div>
+      <div class="header-center">
+        <div class="current-chord-box">
+          <span class="chord-label">ACORDE</span>
+          <span id="current-chord" class="chord-value">-</span>
+        </div>
+        <div class="scale-box">
+          <label>Escala:</label>
+          <select id="scale-select"><option value="none">— Ninguna —</option></select>
+        </div>
+      </div>
+      <div class="header-right">
+        <button id="btn-toggle-harmony" class="toggle-btn" title="Armonía">🎵</button>
+        <button id="btn-toggle-tab" class="toggle-btn" title="Tablatura">🎸</button>
+        <button id="btn-exit-stage" class="exit-btn">EXIT</button>
+      </div>
+    </div>
+
+    <!-- Barra superior fija (progreso + drawers) -->
+    <div id="sticky-top-bar">
+      <!-- Barra de progreso -->
+      <div id="progress-bar-container">
+        <div id="progress-bar"><div id="progress-fill"></div></div>
+        <div id="progress-info">
+          <span id="progress-percent">0%</span>
+          <span id="progress-position">-</span>
+        </div>
+      </div>
+
+      <!-- Drawer de Armonía -->
+      <div id="drawer-harmony" class="drawer">
+        <div class="drawer-header">
+          <span> ARMONÍA - Diapasón y Piano</span>
+          <button class="drawer-close" onclick="window.stage.toggleHarmony()">✕</button>
+        </div>
+        <div class="drawer-content">
+          <div class="diagrams-row">
+            <div class="diagram-col">
+              <div id="diagram-fretboard" class="diagram-box"></div>
+              <div class="diagram-legend" id="legend-fretboard"></div>
+            </div>
+            <div class="diagram-col">
+              <div id="diagram-piano" class="diagram-box"></div>
+              <div class="diagram-legend" id="legend-piano"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawer de Tablatura -->
+      <div id="drawer-tab" class="drawer">
+        <div class="drawer-header">
+          <span>🎸 TABLATURA</span>
+          <button class="drawer-close" onclick="window.stage.toggleTab()">✕</button>
+        </div>
+        <div class="drawer-content">
+          <div id="diagram-tab" class="tab-box"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenido de letra -->
+    <div id="stage-content"></div>
+
+    <!-- Controles inferiores -->
+    <div id="stage-controls">
+      <button class="stage-btn" onclick="window.stage.adjustFontSize(-2)">A-</button>
+      <button class="stage-btn" onclick="window.stage.adjustFontSize(2)">A+</button>
+      <button class="stage-btn" onclick="window.stage.adjustTranspose(-1)">T-</button>
+      <button class="stage-btn" onclick="window.stage.adjustTranspose(1)">T+</button>
+      <button class="stage-btn" onclick="window.stage.prevChord()">⏮</button>
+      <button class="stage-btn" id="btn-autoscroll" onclick="window.stage.toggleAutoScroll()">▶ PLAY</button>
+      <button class="stage-btn" onclick="window.stage.nextChord()">⏭</button>
+      <button class="stage-btn exit-btn-mobile" onclick="window.stage.exitStageMode()">EXIT</button>
+    </div>
+
+    <div id="touch-left" class="touch-zone"></div>
+    <div id="touch-right" class="touch-zone"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+{
+  "id": "charly-garcia-nos-siguen-pegando-abajo",
+  "metadata": {
+    "title": "Nos siguen pegando abajo (Pecado Mortal)",
+    "artist": "Charly García",
+    "originalKey": "G",
+    "bpm": 120,
+    "timeSignature": "4/4"
+  },
+  "references": {
+    "youtube_studio": "",
+    "youtube_live": "",
+    "youtube_tutorial": ""
+  },
+  "structure": [
+    {
+      "type": "Intro",
+      "label": "Intro",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "G D A E (x4)",
+          "chords": []
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Verso 1",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Ella es menor, él es normal",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "Y lo que están haciendo es un pecado mortal",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 31 }
+          ]
+        },
+        {
+          "lyrics": "Ella se quedó sin boda ni arroz",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "Y al novio lo agarraron entre muchos más que dos",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 29 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "PreChorus",
+      "label": "Pre-Coro 1",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Miren, lo están golpeando todo el tiempo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 26 }
+          ]
+        },
+        {
+          "lyrics": "Lo vuelven, vuelven a golpear",
+          "chords": [
+            { "chord": "B", "position": 0 },
+            { "chord": "Em", "position": 12 },
+            { "chord": "D", "position": 21 }
+          ]
+        },
+        {
+          "lyrics": "Nos siguen pegando aba-jo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 11 },
+            { "chord": "D", "position": 19 },
+            { "chord": "G", "position": 25 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Verso 2",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Yo estaba en un club, no había casi luz",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 22 }
+          ]
+        },
+        {
+          "lyrics": "La puerta de salida tenía un farolito azul",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 31 }
+          ]
+        },
+        {
+          "lyrics": "Él se desmayó delante de mí",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "No fueron las pastillas, fueron los hombres de gris",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 25 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "PreChorus",
+      "label": "Pre-Coro 2",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Miren, lo están golpeando todo el tiempo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 26 }
+          ]
+        },
+        {
+          "lyrics": "Lo vuelven, vuelven a golpear",
+          "chords": [
+            { "chord": "B", "position": 0 },
+            { "chord": "Em", "position": 12 },
+            { "chord": "D", "position": 21 }
+          ]
+        },
+        {
+          "lyrics": "Nos siguen pegando aba-jo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 11 },
+            { "chord": "D", "position": 19 },
+            { "chord": "G", "position": 25 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Bridge",
+      "label": "Puente (Esus4 x2)",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Esus4 (x2)",
+          "chords": []
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Na Na Na (x2)",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Na na na na na na na na na",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 6 },
+            { "chord": "A", "position": 12 },
+            { "chord": "E", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "na na na na na na na na na",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 6 },
+            { "chord": "A", "position": 12 },
+            { "chord": "E", "position": 18 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Verso 3",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Ma-ma-ma, estoy yéndome",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 10 }
+          ]
+        },
+        {
+          "lyrics": "Soy como una luz apagándose",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 17 }
+          ]
+        },
+        {
+          "lyrics": "Desde el piso los pude ver",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "D", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "locos de placer, alejándose.",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E", "position": 16 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "PreChorus",
+      "label": "Pre-Coro Final",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Miren, lo están golpeando todo el tiempo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 26 }
+          ]
+        },
+        {
+          "lyrics": "Lo vuelven, vuelven a golpear",
+          "chords": [
+            { "chord": "B", "position": 0 },
+            { "chord": "Em", "position": 12 },
+            { "chord": "D", "position": 21 }
+          ]
+        },
+        {
+          "lyrics": "Nos siguen pegando aba-jo",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 11 },
+            { "chord": "D", "position": 19 },
+            { "chord": "G", "position": 25 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Outro",
+      "label": "Outro (Esus4)",
+      "key": "G",
+      "lines": [
+        {
+          "lyrics": "Esus4",
+          "chords": []
+        }
+      ]
+    }
+  ]
+}

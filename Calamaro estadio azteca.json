@@ -1,0 +1,214 @@
+{
+  "id": "andres-calamaro-estadio-azteca",
+  "metadata": {
+    "title": "Estadio Azteca",
+    "artist": "Andrés Calamaro",
+    "originalKey": "Em",
+    "bpm": 115,
+    "timeSignature": "4/4"
+  },
+  "references": {
+    "youtube_studio": "https://www.youtube.com/watch?v=6i6XQzR5w6I",
+    "youtube_live": "https://www.youtube.com/watch?v=J7_bMdYfSws",
+    "youtube_tutorial": ""
+  },
+  "structure": [
+    {
+      "type": "Verse",
+      "label": "Estrofa 1",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Prendido a tu botella vacia,",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "C", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "esa que antes, siempre tuvo gusto a nada.",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "B7", "position": 15 },
+            { "chord": "Em", "position": 29 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 2",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Apretando los dedos , agarrándome,",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "C", "position": 16 }
+          ]
+        },
+        {
+          "lyrics": "dandole mi vida",
+          "chords": [
+            { "chord": "G", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "a ese para-avalanchas.",
+          "chords": [
+            { "chord": "B7", "position": 0 },
+            { "chord": "Em", "position": 6 },
+            { "chord": "B7", "position": 11 }
+          ]
+        },
+        {
+          "lyrics": "(Em C G B7 Em)",
+          "chords": [
+            { "chord": "Em", "position": 1 },
+            { "chord": "C", "position": 5 },
+            { "chord": "G", "position": 7 },
+            { "chord": "B7", "position": 9 },
+            { "chord": "Em", "position": 13 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 3",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Cuando era niño y conocí el estadio",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "C", "position": 28 }
+          ]
+        },
+        {
+          "lyrics": "Azteca, me quede duro.",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "B7", "position": 8 },
+            { "chord": "Em", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "Me aplastó ver al gigante y de grande",
+          "chords": [
+            { "chord": "C", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "me volvió a pasar lo mismo,",
+          "chords": [
+            { "chord": "G", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "pero ya estaba duro mucho antes. Uh Uh uh....",
+          "chords": [
+            { "chord": "B7", "position": 0 },
+            { "chord": "Em", "position": 15 },
+            { "chord": "B7", "position": 20 },
+            { "chord": "Em", "position": 26 },
+            { "chord": "C", "position": 33 },
+            { "chord": "G", "position": 36 },
+            { "chord": "B7", "position": 39 },
+            { "chord": "Em", "position": 44 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Estribillo",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Dicen que hay, dicen que hay,",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 15 }
+          ]
+        },
+        {
+          "lyrics": "un mundo de tentaciones,",
+          "chords": [
+            { "chord": "B7", "position": 0 },
+            { "chord": "Em", "position": 12 }
+          ]
+        },
+        {
+          "lyrics": "tambien hay caramelos con forma de corazones.",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 12 },
+            { "chord": "B7", "position": 26 },
+            { "chord": "Em", "position": 42 }
+          ]
+        },
+        {
+          "lyrics": "Dicen que hay bueno, malo, dicen que hay más o menos",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 14 },
+            { "chord": "B7", "position": 27 },
+            { "chord": "Em", "position": 48 }
+          ]
+        },
+        {
+          "lyrics": "Dicen que hay algo que tener, y no muchos",
+          "chords": [
+            { "chord": "C", "position": 0 },
+            { "chord": "G", "position": 14 },
+            { "chord": "B7", "position": 30 }
+          ]
+        },
+        {
+          "lyrics": "tenemos... ay ay ay ay",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "B7", "position": 11 },
+            { "chord": "Em", "position": 14 },
+            { "chord": "C", "position": 17 },
+            { "chord": "G", "position": 20 }
+          ]
+        },
+        {
+          "lyrics": "Y no muchos tenemos. uh uh uh...",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "B7", "position": 12 },
+            { "chord": "Em", "position": 21 },
+            { "chord": "C", "position": 24 },
+            { "chord": "G", "position": 27 },
+            { "chord": "B7", "position": 29 },
+            { "chord": "Em", "position": 31 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Outro",
+      "label": "Final (Igual que al principio)",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Prendido a tu botella vacía,",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "C", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "esa que antes, siempre tuvo gusto a nada.",
+          "chords": [
+            { "chord": "G", "position": 0 },
+            { "chord": "B7", "position": 15 }
+          ]
+        }
+      ]
+    }
+  ]
+}

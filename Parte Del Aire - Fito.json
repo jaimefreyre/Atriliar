@@ -1,0 +1,331 @@
+{
+  "id": "fito-paez-parte-del-aire",
+  "metadata": {
+    "title": "Parte del Aire",
+    "artist": "Fito Páez",
+    "originalKey": "E",
+    "bpm": 95,
+    "timeSignature": "4/4"
+  },
+  "references": {
+    "youtube_studio": "https://www.youtube.com/watch?v=example",
+    "youtube_live": "",
+    "youtube_tutorial": ""
+  },
+  "structure": [
+    {
+      "type": "Intro",
+      "label": "Intro",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 },
+            { "chord": "Bm7/E", "position": 11 },
+            { "chord": "Amaj7/9/E", "position": 18 },
+            { "chord": "Bm7/E", "position": 29 },
+            { "chord": "Amaj7/9/E", "position": 36 },
+            { "chord": "Bm7/E", "position": 47 },
+            { "chord": "Amaj7/9/E", "position": 54 },
+            { "chord": "Bm7/E", "position": 65 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 1",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Lo pensó dos veces y se marchó,",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 },
+            { "chord": "Bm7/E", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "como una frutilla su corazón",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 },
+            { "chord": "Bm7/E", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "siempre el mismo rollo con los parientes.",
+          "chords": [
+            { "chord": "C#m7", "position": 0 },
+            { "chord": "F#m7", "position": 12 },
+            { "chord": "Bm7", "position": 22 },
+            { "chord": "E7", "position": 29 }
+          ]
+        },
+        {
+          "lyrics": "Me dejó unos discos en el placard,",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "un reloj de plata y un samurai",
+          "chords": [
+            { "chord": "Bm7/E", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "todo detallado en un expediente.",
+          "chords": [
+            { "chord": "C#m7", "position": 0 },
+            { "chord": "F#m7", "position": 10 },
+            { "chord": "Bm7", "position": 18 },
+            { "chord": "E7", "position": 24 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Coro 1",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Y allí va... parte del aire,",
+          "chords": [
+            { "chord": "Dmaj7/9", "position": 0 },
+            { "chord": "G#m7/11", "position": 13 },
+            { "chord": "G7(b5)", "position": 19 },
+            { "chord": "F#m7/11", "position": 23 },
+            { "chord": "F#m7/E", "position": 27 }
+          ]
+        },
+        {
+          "lyrics": "y allí va... en libertad.",
+          "chords": [
+            { "chord": "Dmaj7/9", "position": 0 },
+            { "chord": "Bm7", "position": 11 },
+            { "chord": "E7", "position": 18 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Interlude",
+      "label": "Interludio",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 },
+            { "chord": "Bm7/E", "position": 11 },
+            { "chord": "Amaj7/9/E", "position": 18 },
+            { "chord": "Bm7/E", "position": 29 },
+            { "chord": "Amaj7/9/E", "position": 36 },
+            { "chord": "Bm7/E", "position": 47 },
+            { "chord": "Amaj7/9/E", "position": 54 },
+            { "chord": "Bm7/E", "position": 65 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 2",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Música de grillos del Paraná,",
+          "chords": [
+            { "chord": "Amaj7/9", "position": 0 },
+            { "chord": "Bm7", "position": 20 }
+          ]
+        },
+        {
+          "lyrics": "cada Enero nuevo se hacía escuchar",
+          "chords": [
+            { "chord": "Amaj7/9", "position": 0 },
+            { "chord": "Bm7", "position": 20 }
+          ]
+        },
+        {
+          "lyrics": "como un buen presagio de las comadres.",
+          "chords": [
+            { "chord": "C#m7", "position": 0 },
+            { "chord": "F#m7", "position": 12 },
+            { "chord": "Bm7", "position": 22 },
+            { "chord": "E7", "position": 29 }
+          ]
+        },
+        {
+          "lyrics": "El amó una estrella en su soledad",
+          "chords": [
+            { "chord": "Amaj7/9", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "y una noche antes de navidad",
+          "chords": [
+            { "chord": "Bm7", "position": 0 }
+          ]
+        },
+        {
+          "lyrics": "recortó los cables con un diamante.",
+          "chords": [
+            { "chord": "C#m7", "position": 0 },
+            { "chord": "F#m7", "position": 10 },
+            { "chord": "Bm7", "position": 18 },
+            { "chord": "E7", "position": 24 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Coro 2",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Y allí van... parte del aire,",
+          "chords": [
+            { "chord": "Dmaj7/9", "position": 0 },
+            { "chord": "G#m7/11", "position": 14 },
+            { "chord": "G7(b5)", "position": 20 },
+            { "chord": "F#m7/11", "position": 24 },
+            { "chord": "F#m7/E", "position": 28 }
+          ]
+        },
+        {
+          "lyrics": "y allí van... en libertad.",
+          "chords": [
+            { "chord": "Dmaj7/9", "position": 0 },
+            { "chord": "Bm7", "position": 12 },
+            { "chord": "E7", "position": 19 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Interlude",
+      "label": "Interludio",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E  Amaj7/9/E  Bm7/E",
+          "chords": [
+            { "chord": "Amaj7/9/E", "position": 0 },
+            { "chord": "Bm7/E", "position": 11 },
+            { "chord": "Amaj7/9/E", "position": 18 },
+            { "chord": "Bm7/E", "position": 29 },
+            { "chord": "Amaj7/9/E", "position": 36 },
+            { "chord": "Bm7/E", "position": 47 },
+            { "chord": "Amaj7/9/E", "position": 54 },
+            { "chord": "Bm7/E", "position": 65 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Bridge",
+      "label": "Puente",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "El amor más grande que conocí",
+          "chords": [
+            { "chord": "C#maj7", "position": 0 },
+            { "chord": "C#m7", "position": 13 },
+            { "chord": "F#7sus4", "position": 22 }
+          ]
+        },
+        {
+          "lyrics": "sin querer un día pasó por mí,",
+          "chords": [
+            { "chord": "Bmaj7", "position": 0 },
+            { "chord": "Bm7", "position": 12 },
+            { "chord": "E7sus4", "position": 19 }
+          ]
+        },
+        {
+          "lyrics": "por la vía láctea se encontrarán,",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E/G#", "position": 8 },
+            { "chord": "F#m7", "position": 14 },
+            { "chord": "F#7/A#", "position": 23 }
+          ]
+        },
+        {
+          "lyrics": "en algún planeta, en algún lugar.",
+          "chords": [
+            { "chord": "B", "position": 0 },
+            { "chord": "Bm7", "position": 10 },
+            { "chord": "C#maj7", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "Donde va la gente y su corazón,",
+          "chords": [
+            { "chord": "C#maj7", "position": 0 },
+            { "chord": "C#m7", "position": 13 },
+            { "chord": "F#7sus4", "position": 22 }
+          ]
+        },
+        {
+          "lyrics": "donde van los años y este dolor",
+          "chords": [
+            { "chord": "Bmaj7", "position": 0 },
+            { "chord": "Bm7", "position": 12 },
+            { "chord": "E7sus4", "position": 19 }
+          ]
+        },
+        {
+          "lyrics": "y donde voy yo, no me importa ya,",
+          "chords": [
+            { "chord": "A", "position": 0 },
+            { "chord": "E/G#", "position": 7 },
+            { "chord": "F#m7", "position": 13 },
+            { "chord": "F#7/A#", "position": 22 }
+          ]
+        },
+        {
+          "lyrics": "vengo de dos ríos que dan al mar...",
+          "chords": [
+            { "chord": "B", "position": 0 },
+            { "chord": "Bm7", "position": 8 },
+            { "chord": "E7", "position": 16 },
+            { "chord": "Dmaj7/9", "position": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Outro",
+      "label": "Outro",
+      "key": "E",
+      "lines": [
+        {
+          "lyrics": "Parte del aire.",
+          "chords": [
+            { "chord": "G#m7/11", "position": 0 },
+            { "chord": "G7(b5)", "position": 6 },
+            { "chord": "F#m7/11", "position": 10 },
+            { "chord": "F#m7/E", "position": 14 }
+          ]
+        },
+        {
+          "lyrics": "Y allí van... solo, solo en libertad.",
+          "chords": [
+            { "chord": "Dmaj7/9", "position": 0 },
+            { "chord": "Bm7", "position": 14 },
+            { "chord": "A/C#", "position": 20 },
+            { "chord": "Dmaj7", "position": 25 },
+            { "chord": "B7/D#", "position": 28 },
+            { "chord": "Bm7", "position": 35 },
+            { "chord": "E7", "position": 36 }
+          ]
+        }
+      ]
+    }
+  ]
+}

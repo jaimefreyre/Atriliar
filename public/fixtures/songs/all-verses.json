@@ -1,0 +1,9 @@
+﻿{
+  "id": "test-all-verses",
+  "metadata": { "title": "Canción de Prueba Versos", "artist": "Test Band", "originalKey": "C", "bpm": 120, "timeSignature": "4/4" },
+  "structure": [
+    { "type": "Verse", "label": "Verso 1", "key": "C", "lines": [ { "lyrics": "Primer verso aquí", "chords": [{ "chord": "C", "position": 0 }, { "chord": "F", "position": 7 }] } ] },
+    { "type": "Verse", "label": "Verso 2", "key": "C", "lines": [ { "lyrics": "Segundo verso distinto", "chords": [{ "chord": "Am", "position": 0 }, { "chord": "G", "position": 8 }] } ] },
+    { "type": "Chorus", "label": "Coro", "key": "F", "lines": [ { "lyrics": "Este es el coro", "chords": [{ "chord": "F7M(9)", "position": 0 }, { "chord": "G7(b13)", "position": 10 }] } ] }
+  ]
+}

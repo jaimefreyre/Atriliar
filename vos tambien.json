@@ -1,0 +1,265 @@
+{
+  "id": "charly-garcia-vos-tambien-estabas-verde",
+  "metadata": {
+    "title": "Vos también estabas verde",
+    "artist": "Charly García",
+    "originalKey": "Em",
+    "bpm": 95,
+    "timeSignature": "4/4"
+  },
+  "references": {
+    "youtube_studio": "https://www.youtube.com/watch?v=6i6XQzR5w6I",
+    "youtube_live": "https://www.youtube.com/watch?v=example_live",
+    "youtube_tutorial": ""
+  },
+  "structure": [
+    {
+      "type": "Intro",
+      "label": "Intro (Tab: 7-9-10-11 en cuerdas agudas)",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "(Intro instrumental)",
+          "chords": []
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 1",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Vuela un jet hacia el sur",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "Cm/Eb", "position": 11 }
+          ]
+        },
+        {
+          "lyrics": "la cosmica figura",
+          "chords": [
+            { "chord": "G/B", "position": 2 }
+          ]
+        },
+        {
+          "lyrics": "del folclorico ataud de un DS-10",
+          "chords": [
+            { "chord": "C/E", "position": 4 },
+            { "chord": "G/B", "position": 19 }
+          ]
+        },
+        {
+          "lyrics": "que se hace estrellas contra el cielo",
+          "chords": [
+            { "chord": "Gsus4", "position": 7 },
+            { "chord": "G", "position": 12 },
+            { "chord": "Dsus4", "position": 26 },
+            { "chord": "Ebdim", "position": 32 }
+          ]
+        },
+        {
+          "lyrics": "Hoy estoy como un jet",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "Cm/Eb", "position": 9 }
+          ]
+        },
+        {
+          "lyrics": "perdido entre las nubes",
+          "chords": [
+            { "chord": "G/B", "position": 3 }
+          ]
+        },
+        {
+          "lyrics": "sin señales para ver adonde voy",
+          "chords": [
+            { "chord": "C/E", "position": 6 },
+            { "chord": "G/B", "position": 19 }
+          ]
+        },
+        {
+          "lyrics": "pero mi corazon no es ciego",
+          "chords": [
+            { "chord": "Gsus4", "position": 3 },
+            { "chord": "G", "position": 8 },
+            { "chord": "Dsus4", "position": 18 },
+            { "chord": "D", "position": 24 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Estribillo 1",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Puedo subir al cielo",
+          "chords": [
+            { "chord": "D/C", "position": 0 },
+            { "chord": "G/B", "position": 6 }
+          ]
+        },
+        {
+          "lyrics": "puedo vivir haciendote el amor",
+          "chords": [
+            { "chord": "F/Eb", "position": 0 },
+            { "chord": "Abmaj7", "position": 6 },
+            { "chord": "Gm", "position": 12 },
+            { "chord": "C7", "position": 23 }
+          ]
+        },
+        {
+          "lyrics": "pero me voy",
+          "chords": [
+            { "chord": "Cm7/9", "position": 0 },
+            { "chord": "D7", "position": 5 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 2",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Otro whisky y ya van mil",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "Cm/Eb", "position": 11 }
+          ]
+        },
+        {
+          "lyrics": "yo me pregunto entonces si aun estarias aqui",
+          "chords": [
+            { "chord": "G/B", "position": 2 }
+          ]
+        },
+        {
+          "lyrics": "cuando yo no era nadie",
+          "chords": [
+            { "chord": "C/E", "position": 7 },
+            { "chord": "G/B", "position": 15 }
+          ]
+        },
+        {
+          "lyrics": "y no tenia plata en el bolsillo",
+          "chords": [
+            { "chord": "Gsus4", "position": 7 },
+            { "chord": "G", "position": 10 },
+            { "chord": "Dsus4", "position": 18 },
+            { "chord": "Ebdim", "position": 24 }
+          ]
+        },
+        {
+          "lyrics": "La nostalgia aqui otra vez",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "Cm/Eb", "position": 12 }
+          ]
+        },
+        {
+          "lyrics": "no entiendo los que hacen lo mismo que yo hice ayer",
+          "chords": [
+            { "chord": "G/B", "position": 3 }
+          ]
+        },
+        {
+          "lyrics": "pero como hasta ahi nomas",
+          "chords": [
+            { "chord": "C/E", "position": 6 },
+            { "chord": "G/B", "position": 18 }
+          ]
+        },
+        {
+          "lyrics": "como viviendo en el pasado",
+          "chords": [
+            { "chord": "Gsus4", "position": 3 },
+            { "chord": "G", "position": 8 },
+            { "chord": "Dsus4", "position": 15 },
+            { "chord": "D", "position": 21 }
+          ]
+        },
+        {
+          "lyrics": "Me escape sin pensar",
+          "chords": [
+            { "chord": "Em", "position": 0 },
+            { "chord": "Cm/Eb", "position": 10 }
+          ]
+        },
+        {
+          "lyrics": "escuche a los Beatles y me fui a buscar la soledad",
+          "chords": [
+            { "chord": "G/B", "position": 0 },
+            { "chord": "C/E", "position": 15 },
+            { "chord": "G/B", "position": 35 }
+          ]
+        },
+        {
+          "lyrics": "y vos tambien estabas verde",
+          "chords": [
+            { "chord": "Gsus4", "position": 0 },
+            { "chord": "G", "position": 5 },
+            { "chord": "Dsus4", "position": 15 },
+            { "chord": "D", "position": 22 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Estribillo 2",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Puedo subir al cielo",
+          "chords": [
+            { "chord": "D/C", "position": 0 },
+            { "chord": "G/B", "position": 6 }
+          ]
+        },
+        {
+          "lyrics": "puedo morir haciendote el amor",
+          "chords": [
+            { "chord": "F/Eb", "position": 0 },
+            { "chord": "Abmaj7", "position": 6 },
+            { "chord": "Gm", "position": 12 },
+            { "chord": "C7", "position": 23 }
+          ]
+        },
+        {
+          "lyrics": "pero me voy...",
+          "chords": [
+            { "chord": "Cm7/9", "position": 0 },
+            { "chord": "D7", "position": 5 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Outro",
+      "label": "Referencia de Posiciones",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Em: 022000 | Cm/Eb: x6554x | G/B: x20033 | C/E: xx2013",
+          "chords": []
+        },
+        {
+          "lyrics": "Gsus4: 320013 | G: 320003 | Dsus4: xx0233 | Ebdim: xx1212",
+          "chords": []
+        },
+        {
+          "lyrics": "D: xx0232 | D/C: x3423x | F/Eb: x6756x | Abmaj7: 4x554x",
+          "chords": []
+        },
+        {
+          "lyrics": "Gm: 355333 | C7: x35353 | Cm7/9: x3133x | D7: xx0212",
+          "chords": []
+        }
+      ]
+    }
+  ]
+}

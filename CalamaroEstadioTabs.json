@@ -1,0 +1,90 @@
+{
+  "id": "andres-calamaro-estadio-azteca",
+  "metadata": {
+    "title": "Estadio Azteca",
+    "artist": "Andrés Calamaro",
+    "originalKey": "Em",
+    "bpm": 115,
+    "timeSignature": "4/4"
+  },
+  "references": {
+    "youtube_studio": "https://www.youtube.com/watch?v=6i6XQzR5w6I",
+    "youtube_live": "https://www.youtube.com/watch?v=J7_bMdYfSws",
+    "youtube_tutorial": ""
+  },
+  "structure": [
+    {
+      "type": "Intro",
+      "label": "Intro (Comienzo de la voz)",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "(Intro instrumental)",
+          "chords": [{ "chord": "Em", "position": 0 }],
+          "tab": [
+            { "string": 1, "fret": 0 },
+            { "string": 5, "fret": 3 },
+            { "string": 1, "fret": 3 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Estrofa 1",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Prendido a tu botella vacia,",
+          "chords": [{ "chord": "Em", "position": 0 }, { "chord": "C", "position": 14 }],
+          "tab": [
+            { "string": 1, "fret": 0 }, { "string": 5, "fret": 2 },
+            { "string": 5, "fret": 3 }, { "string": 4, "fret": 5 },
+            { "string": 1, "fret": 3 }, { "string": 5, "fret": 5 },
+            { "string": 4, "fret": 4 }, { "string": 5, "fret": 2 }
+          ]
+        },
+        {
+          "lyrics": "esa que antes, siempre tuvo gusto a nada.",
+          "chords": [{ "chord": "G", "position": 0 }, { "chord": "B7", "position": 15 }, { "chord": "Em", "position": 29 }]
+        }
+      ]
+    },
+    {
+      "type": "Verse",
+      "label": "Solo Voz (Ooh, Ooh)",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "(Ooh, Ooh)",
+          "chords": [{ "chord": "Em", "position": 0 }],
+          "tab": [
+            { "string": 1, "fret": 0 }, { "string": 5, "fret": 2 },
+            { "string": 5, "fret": 3 }, { "string": 4, "fret": 5 },
+            { "string": 1, "fret": 3 }, { "string": 5, "fret": 5 },
+            { "string": 4, "fret": 4 }, { "string": 5, "fret": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Chorus",
+      "label": "Coro",
+      "key": "Em",
+      "lines": [
+        {
+          "lyrics": "Dicen que hay, dicen que hay,",
+          "chords": [{ "chord": "C", "position": 0 }, { "chord": "G", "position": 15 }],
+          "tab": [
+            { "string": 5, "fret": 3 }, { "string": 4, "fret": 5 },
+            { "string": 2, "fret": 7 }, { "string": 5, "fret": 7 }
+          ]
+        },
+        {
+          "lyrics": "un mundo de tentaciones,",
+          "chords": [{ "chord": "B7", "position": 0 }, { "chord": "Em", "position": 12 }]
+        }
+      ]
+    }
+  ]
+}
