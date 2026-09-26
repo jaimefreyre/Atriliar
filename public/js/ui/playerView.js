@@ -12,6 +12,7 @@ import { createTransport } from '../transport/transport.js';
 import { createAudioTrackAdapter } from '../transport/audioTrack.js';
 import { createGeneratedBackingAdapter } from '../transport/generatedBacking.js';
 import { createInputActionListener, ACTIONS } from '../stage/inputActions.js';
+import { requestWakeLock, releaseWakeLock } from '../stage/wakeLock.js';
 import { getBlocks, getActiveBlockIndex, getActiveChord, getActiveTab } from '../timeline/selectors.js';
 import { renderPrompter } from '../rendering/prompter.js';
 import { renderFretboard, renderPiano, setActiveScale } from '../rendering/chordDiagram.js';
@@ -84,6 +85,11 @@ function renderTransportControls() {
       onClose: () => document.getElementById('player-evaluate')?.focus(),
     }),
   }, ['🎙 Evaluar ritmo']));
+  const isFullscreen = document.fullscreenElement === document.getElementById('player-view');
+  fineControls.appendChild(el('button', {
+    className: 'btn-tiny', id: 'player-fullscreen', onclick: toggleFullscreen,
+    'aria-pressed': String(isFullscreen),
+  }, [isFullscreen ? 'Salir de pantalla completa' : '⛶ Pantalla completa']));
   wrap.appendChild(fineControls);
   return wrap;
 }
@@ -166,11 +172,53 @@ function renderChrome(container) {
     wrap.appendChild(el('p', { style: 'color:#f2b45a;font-size:0.85em' }, ['Audio vinculado no disponible: reproduciendo con base generada.']));
   }
   wrap.appendChild(el('div', { className: 'prompter-screen', id: 'prompter-screen' }));
+  wrap.appendChild(el('p', { id: 'stage-status', className: 'stage-status', role: 'status', 'aria-live': 'polite' }, ['Modo escenario listo.']));
   wrap.appendChild(renderTransportControls());
   if (current.harmonyVisible) wrap.appendChild(renderHarmonyPanel());
   if (current.tabVisible) wrap.appendChild(renderTabPanel());
   wrap.appendChild(el('button', { className: 'btn-secondary', style: 'margin-top:16px', onclick: close }, ['Cerrar']));
   container.appendChild(wrap);
+}
+
+async function toggleFullscreen() {
+  const container = document.getElementById('player-view');
+  const status = document.getElementById('stage-status');
+  try {
+    if (document.fullscreenElement === container) {
+      await document.exitFullscreen();
+    } else if (container.requestFullscreen) {
+      await container.requestFullscreen();
+      const locked = await requestWakeLock();
+      if (status) status.textContent = locked ? 'Pantalla completa activa. Pantalla siempre encendida.' : 'Pantalla completa activa. El dispositivo puede apagar la pantalla.';
+    } else if (status) {
+      status.textContent = 'Este navegador no admite pantalla completa.';
+    }
+  } catch (err) {
+    if (status) status.textContent = `No se pudo cambiar a pantalla completa: ${err.message || 'permiso denegado'}.`;
+  }
+}
+
+function onFullscreenChange() {
+  const container = document.getElementById('player-view');
+  const active = document.fullscreenElement === container;
+  const button = document.getElementById('player-fullscreen');
+  const status = document.getElementById('stage-status');
+  if (button) {
+    button.textContent = active ? 'Salir de pantalla completa' : '⛶ Pantalla completa';
+    button.setAttribute('aria-pressed', String(active));
+  }
+  if (!active) {
+    releaseWakeLock();
+    if (status) status.textContent = 'Pantalla completa cerrada.';
+  }
+}
+
+async function onVisibilityChange() {
+  if (document.visibilityState === 'visible' && document.fullscreenElement === document.getElementById('player-view')) {
+    const locked = await requestWakeLock();
+    const status = document.getElementById('stage-status');
+    if (status) status.textContent = locked ? 'Pantalla completa activa. Pantalla siempre encendida.' : 'Pantalla completa activa. El dispositivo puede apagar la pantalla.';
+  }
 }
 
 function renderFrame() {
@@ -254,6 +302,8 @@ export async function openPlayerView(song, onClose) {
     inputListener: createInputActionListener({ onAction: handleInputAction, target: container }),
   };
   container.tabIndex = -1;
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('visibilitychange', onVisibilityChange);
   document.getElementById('app').style.display = 'none';
   container.style.display = 'block';
   renderChrome(container);
@@ -265,9 +315,13 @@ export async function openPlayerView(song, onClose) {
 function close() {
   current?.transport?.dispose();
   current?.inputListener?.dispose();
+  document.removeEventListener('fullscreenchange', onFullscreenChange);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
+  releaseWakeLock();
+  const container = document.getElementById('player-view');
+  if (document.fullscreenElement === container) document.exitFullscreen().catch(() => {});
   if (current?.audioCtx) current.audioCtx.close().catch(() => {});
   const onClose = current?.onClose;
-  const container = document.getElementById('player-view');
   container.style.display = 'none';
   container.innerHTML = '';
   document.getElementById('app').style.display = 'block';
