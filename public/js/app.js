@@ -1,11 +1,11 @@
-﻿import { getAllSongs, saveSong, deleteSong, getAllSongsV2, deleteSongV2 } from './data/indexedDb.js';
+﻿import { getAllSongs, saveSong, deleteSong, getAllSongsV2, deleteSongV2, getSongV2 } from './data/indexedDb.js';
 import { validateSong, detectSongFormat } from './data/songValidator.js';
 import { migrateLegacySong } from './data/legacyImporter.js';
 import { importSongV2Document } from './data/importSongV2.js';
 import { askCollision, promptBarsPerLine, showInfo } from './ui/importDialog.js';
 import { openCalibrationEditor } from './ui/calibrationEditor.js';
 import { openPlayerView } from './ui/playerView.js';
-import { enterStageMode, exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
+import { exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
 
 window.addEventListener('stageprompter:db', (e) => {
   alert(`Base de datos: ${e.detail.message}`);
@@ -16,7 +16,6 @@ window.stage = { adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, n
 
 let songs = [];
 let songsV2 = [];
-let currentEditSong = null;
 
 function buildBadge(text, extraClass) {
   const span = document.createElement('span');
@@ -135,158 +134,33 @@ async function loadLibrary() {
       if (song) await openPlayerView(song, loadLibrary);
     } else if (action === 'stage') {
       const song = songs.find(s => s.id === id);
-      if (song) {
-        document.getElementById('app').style.display = 'none';
-        document.getElementById('stage-container').style.display = 'block';
-        enterStageMode(song, document.getElementById('stage-content'));
-      }
+      if (song) await openLegacyThroughV2(song, openPlayerView);
     } else if (action === 'edit') {
       const song = songs.find(s => s.id === id);
-      if (song) openEditor(song);
+      if (song) await openLegacyThroughV2(song, openCalibrationEditor);
     }
   };
 }
 
-const modal = document.getElementById('editor-modal');
-const closeBtn = document.querySelector('.modal-close');
-
-document.getElementById('btn-new').addEventListener('click', () => {
+document.getElementById('btn-new').addEventListener('click', async () => {
   console.log('➕ Nueva canción');
-  currentEditSong = {
-    id: 'song-' + Date.now(),
-    metadata: { title: 'Nueva Canción', artist: '', originalKey: 'C', bpm: 120, timeSignature: '4/4' },
-    references: { youtube_studio: '', youtube_live: '', youtube_tutorial: '' },
-    structure: [{ type: 'Verse', label: 'Verso 1', key: 'C', lines: [{ lyrics: 'Letra aquí', chords: [] }] }]
+  // Un solo editor: una canción nueva ya nace v2 (con estructura editable
+  // desde la pestaña Estructura), no en el formato legacy sin tiempos.
+  const blank = {
+    schemaVersion: 2,
+    id: `song-${Date.now()}`,
+    metadata: { title: 'Nueva canción', artist: '', key: null, bpm: 120, timeSignature: { numerator: 4, denominator: 4 } },
+    durationMs: 16000,
+    timing: { status: 'estimated', method: 'manual', notes: 'Canción nueva creada desde cero; falta estructura y tiempos reales.' },
+    audio: null,
+    sections: [{ id: 'section-1', type: 'verse', label: 'VERSO 1', key: null, startMs: 0, endMs: 16000 }],
+    lines: [],
+    chords: [],
+    tabs: [],
+    sources: [],
+    reviewWarnings: [],
   };
-  openEditor(currentEditSong);
-});
-
-closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-document.getElementById('btn-cancel-edit').addEventListener('click', () => { modal.style.display = 'none'; });
-modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
-
-document.querySelectorAll('.editor-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.editor-panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
-  });
-});
-
-function openEditor(song) {
-  console.log('️ Abriendo editor:', song.metadata.title);
-  currentEditSong = JSON.parse(JSON.stringify(song));
-  document.getElementById('editor-title').textContent = 'Editar: ' + song.metadata.title;
-  document.getElementById('edit-title').value = currentEditSong.metadata.title || '';
-  document.getElementById('edit-artist').value = currentEditSong.metadata.artist || '';
-  document.getElementById('edit-key').value = currentEditSong.metadata.originalKey || 'C';
-  document.getElementById('edit-bpm').value = currentEditSong.metadata.bpm || 120;
-  document.getElementById('edit-youtube-studio').value = currentEditSong.references?.youtube_studio || '';
-  document.getElementById('edit-youtube-live').value = currentEditSong.references?.youtube_live || '';
-  renderSectionsEditor();
-  modal.style.display = 'flex';
-}
-
-function renderSectionsEditor() {
-  const container = document.getElementById('sections-editor');
-  container.innerHTML = '';
-  currentEditSong.structure.forEach((section, sIdx) => {
-    const secDiv = document.createElement('div');
-    secDiv.className = 'editor-section';
-    secDiv.innerHTML = `
-      <div class="section-header-editor">
-        <input type="text" class="form-input-sm" value="${section.label || section.type}" data-sidx="${sIdx}" data-field="label">
-        <select class="form-input-sm" data-sidx="${sIdx}" data-field="key">
-          ${['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'].map(k => `<option value="${k}" ${section.key === k ? 'selected' : ''}>${k}</option>`).join('')}
-        </select>
-        <button class="btn-small btn-danger" data-remove-section="${sIdx}">🗑️</button>
-      </div>`;
-      
-    section.lines.forEach((line, lIdx) => {
-      const lineDiv = document.createElement('div');
-      lineDiv.className = 'editor-line';
-      let chordsHtml = line.chords.map((ch, cIdx) => `
-        <div class="chord-input-group">
-          <input type="text" class="form-input-sm" value="${ch.chord}" data-sidx="${sIdx}" data-lidx="${lIdx}" data-cidx="${cIdx}" data-field="chord" placeholder="Acorde">
-          <input type="number" class="form-input-sm" value="${ch.position}" data-sidx="${sIdx}" data-lidx="${lIdx}" data-cidx="${cIdx}" data-field="position" style="width:60px">
-          <button class="btn-tiny" data-remove-chord="${sIdx},${lIdx},${cIdx}">×</button>
-        </div>`).join('');
-        
-      lineDiv.innerHTML = `
-        <input type="text" class="form-input" value="${line.lyrics}" data-sidx="${sIdx}" data-lidx="${lIdx}" data-field="lyrics" placeholder="Letra">
-        <div class="chords-editor">
-          ${chordsHtml}
-          <button class="btn-tiny btn-add" data-add-chord="${sIdx},${lIdx}">+ Acorde</button>
-        </div>`;
-      secDiv.appendChild(lineDiv);
-    });
-    
-    const addLineBtn = document.createElement('button');
-    addLineBtn.className = 'btn-small';
-    addLineBtn.textContent = '+ Línea';
-    addLineBtn.dataset.addLine = sIdx;
-    secDiv.appendChild(addLineBtn);
-    container.appendChild(secDiv);
-  });
-  
-  container.querySelectorAll('input, select').forEach(input => {
-    input.addEventListener('change', (e) => {
-      const sIdx = parseInt(e.target.dataset.sidx);
-      const field = e.target.dataset.field;
-      if (field === 'label') currentEditSong.structure[sIdx].label = e.target.value;
-      if (field === 'key') currentEditSong.structure[sIdx].key = e.target.value;
-      const lIdx = e.target.dataset.lidx;
-      if (lIdx !== undefined) {
-        const l = parseInt(lIdx);
-        if (field === 'lyrics') currentEditSong.structure[sIdx].lines[l].lyrics = e.target.value;
-        const cIdx = e.target.dataset.cidx;
-        if (cIdx !== undefined) {
-          const c = parseInt(cIdx);
-          if (field === 'chord') currentEditSong.structure[sIdx].lines[l].chords[c].chord = e.target.value;
-          if (field === 'position') currentEditSong.structure[sIdx].lines[l].chords[c].position = parseInt(e.target.value) || 0;
-        }
-      }
-    });
-  });
-  
-  container.querySelectorAll('[data-remove-section]').forEach(btn => {
-    btn.onclick = () => { currentEditSong.structure.splice(parseInt(btn.dataset.removeSection), 1); renderSectionsEditor(); };
-  });
-  container.querySelectorAll('[data-add-line]').forEach(btn => {
-    btn.onclick = () => { currentEditSong.structure[parseInt(btn.dataset.addLine)].lines.push({ lyrics: '', chords: [] }); renderSectionsEditor(); };
-  });
-  container.querySelectorAll('[data-add-chord]').forEach(btn => {
-    const [s, l] = btn.dataset.addChord.split(',').map(Number);
-    btn.onclick = () => { currentEditSong.structure[s].lines[l].chords.push({ chord: '', position: 0 }); renderSectionsEditor(); };
-  });
-  container.querySelectorAll('[data-remove-chord]').forEach(btn => {
-    const [s, l, c] = btn.dataset.removeChord.split(',').map(Number);
-    btn.onclick = () => { currentEditSong.structure[s].lines[l].chords.splice(c, 1); renderSectionsEditor(); };
-  });
-}
-
-document.getElementById('btn-add-section').addEventListener('click', () => {
-  currentEditSong.structure.push({ type: 'Verse', label: 'Nueva Sección', key: currentEditSong.metadata.originalKey || 'C', lines: [{ lyrics: '', chords: [] }] });
-  renderSectionsEditor();
-});
-
-document.getElementById('btn-save-song').addEventListener('click', async () => {
-  currentEditSong.metadata.title = document.getElementById('edit-title').value || 'Sin título';
-  currentEditSong.metadata.artist = document.getElementById('edit-artist').value;
-  currentEditSong.metadata.originalKey = document.getElementById('edit-key').value;
-  currentEditSong.metadata.bpm = parseInt(document.getElementById('edit-bpm').value) || 120;
-  currentEditSong.references = {
-    youtube_studio: document.getElementById('edit-youtube-studio').value,
-    youtube_live: document.getElementById('edit-youtube-live').value,
-    youtube_tutorial: ''
-  };
-  const validation = validateSong(currentEditSong);
-  if (!validation.valid) { alert('Error:\n' + validation.errors.join('\n')); return; }
-  await saveSong(currentEditSong);
-  modal.style.display = 'none';
-  loadLibrary();
-  alert('Guardada correctamente');
+  await openCalibrationEditor(blank, loadLibrary);
 });
 
 const btnImport = document.getElementById('btn-import');
@@ -302,6 +176,46 @@ btnImport.addEventListener('click', () => {
 
 function formatErrorList(errors) {
   return errors.slice(0, 10).map(er => `${er.instancePath || '/'}: ${er.message}`);
+}
+
+/**
+ * Compases por línea -> migrar -> importar con el mismo flujo de colisión
+ * que IMPORTAR. Compartido entre "abrir una canción v1 en la vista v2" y el
+ * botón de importar un archivo legacy, para no repetir el mismo flujo dos
+ * veces. Devuelve null si el usuario canceló o la migración/validación
+ * falló (ya mostró el diálogo correspondiente); nunca toca el v1 original.
+ */
+async function migrateAndImportLegacy(legacySong) {
+  const bars = await promptBarsPerLine(legacySong?.metadata?.title || legacySong.id);
+  if (bars === null) return null;
+  let migrated, warnings;
+  try {
+    ({ document: migrated, warnings } = migrateLegacySong(legacySong, { barsPerLine: bars }));
+  } catch (migrationErr) {
+    await showInfo('No se pudo migrar', [migrationErr.message]);
+    return null;
+  }
+  const result = await importSongV2Document(migrated, askCollision);
+  if (result.status === 'invalid') {
+    await showInfo('La migración no pasó su propia validación v2', formatErrorList(result.errors));
+    return null;
+  }
+  if (result.status === 'cancelled') return null;
+  return { result, warnings };
+}
+
+/**
+ * Un solo lector/editor para toda la biblioteca: en vez de mantener el
+ * escenario/editor legacy como una segunda experiencia paralela, "STAGE" y
+ * "EDITAR" sobre una canción v1 la migran y abren la vista v2
+ * correspondiente. El documento v1 original nunca se toca.
+ */
+async function openLegacyThroughV2(legacySong, openView) {
+  const outcome = await migrateAndImportLegacy(legacySong);
+  if (!outcome) return;
+  const v2Song = await getSongV2(outcome.result.id);
+  loadLibrary();
+  await openView(v2Song, loadLibrary);
 }
 
 fileInput.addEventListener('change', async (e) => {
@@ -338,20 +252,10 @@ fileInput.addEventListener('change', async (e) => {
       loadLibrary();
     }
     // Oferta explícita y opcional de migración a v2 (no reemplaza lo anterior).
-    const bars = await promptBarsPerLine(raw?.metadata?.title || raw.id || 'canción legacy');
-    if (bars !== null) {
-      try {
-        const { document: migrated, warnings } = migrateLegacySong(raw, { barsPerLine: bars });
-        const result = await importSongV2Document(migrated, askCollision);
-        if (result.status === 'invalid') {
-          await showInfo('La migración no pasó su propia validación v2', formatErrorList(result.errors));
-        } else if (result.status !== 'cancelled') {
-          await showInfo('Migración a v2 completa', [`Estado: ${result.status}`, `ID: ${result.id}`, ...warnings.slice(0, 5)]);
-          loadLibrary();
-        }
-      } catch (migrationErr) {
-        await showInfo('No se pudo migrar', [migrationErr.message]);
-      }
+    const outcome = await migrateAndImportLegacy(raw);
+    if (outcome) {
+      await showInfo('Migración a v2 completa', [`Estado: ${outcome.result.status}`, `ID: ${outcome.result.id}`, ...outcome.warnings.slice(0, 5)]);
+      loadLibrary();
     }
   } else {
     alert('Formato no reconocido: no es un SongDocument v2 (schemaVersion:2) ni un documento legacy (structure[]).');

@@ -24,37 +24,6 @@
     </main>
   </div>
 
-  <div id="editor-modal" class="modal">
-    <div class="modal-content modal-large">
-      <button class="modal-close">&times;</button>
-      <h2 id="editor-title">Editar Canción</h2>
-      <div class="editor-tabs">
-        <button class="editor-tab active" data-tab="metadata">📋 Metadatos</button>
-        <button class="editor-tab" data-tab="structure">🎵 Estructura</button>
-      </div>
-      <div class="editor-content">
-        <div id="tab-metadata" class="editor-panel active">
-          <div class="form-group"><label>Título:</label><input type="text" id="edit-title" class="form-input"></div>
-          <div class="form-group"><label>Artista:</label><input type="text" id="edit-artist" class="form-input"></div>
-          <div class="form-row">
-            <div class="form-group"><label>Tonalidad:</label><select id="edit-key" class="form-input"><option>C</option><option>C#</option><option>D</option><option>D#</option><option>E</option><option>F</option><option>F#</option><option>G</option><option>G#</option><option>A</option><option>A#</option><option>B</option></select></div>
-            <div class="form-group"><label>BPM:</label><input type="number" id="edit-bpm" class="form-input" min="40" max="240"></div>
-          </div>
-          <div class="form-group"><label>YouTube Studio:</label><input type="url" id="edit-youtube-studio" class="form-input"></div>
-          <div class="form-group"><label>YouTube Live:</label><input type="url" id="edit-youtube-live" class="form-input"></div>
-        </div>
-        <div id="tab-structure" class="editor-panel">
-          <div id="sections-editor"></div>
-          <button id="btn-add-section" class="btn-small">+ Agregar Sección</button>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button id="btn-save-song" class="btn-primary">💾 GUARDAR</button>
-        <button id="btn-cancel-edit" class="btn-secondary">CANCELAR</button>
-      </div>
-    </div>
-  </div>
-
   <div id="import-modal" class="modal">
     <div class="modal-content">
       <div id="import-modal-body"></div>
