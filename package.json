@@ -4,7 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/musicEngine.test.js && node --test tests/validation/",
+    "test": "node --test tests/",
     "build:validator": "node scripts/build-validator.cjs"
   },
   "devDependencies": {

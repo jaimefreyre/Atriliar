@@ -1,4 +1,6 @@
-﻿export const SCALES = {
+﻿import { noteToPitchClass, pitchClassToSharpName } from './notes.js';
+
+export const SCALES = {
   'ionian': { name: 'Jónica / Mayor', intervals: [0,2,4,5,7,9,11], category: 'Modos' },
   'dorian': { name: 'Dórica', intervals: [0,2,3,5,7,9,10], category: 'Modos' },
   'phrygian': { name: 'Frigia', intervals: [0,1,3,5,7,8,10], category: 'Modos' },
@@ -30,14 +32,13 @@
 
 export const SCALE_CATEGORIES = ['Modos', 'Pentatónicas', 'Blues', 'Bebop', 'Menores', 'Exóticas', 'Japonesas', 'Simétricas'];
 
-const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
+/** Acepta raíz en sostenidos o bemoles (equivalencia enarmónica vía notes.js). */
 export function getScaleNotes(rootNote, scaleId) {
   const scale = SCALES[scaleId];
   if (!scale) return [];
-  const rootIdx = NOTES.indexOf(rootNote);
-  if (rootIdx === -1) return [];
-  return scale.intervals.map(i => NOTES[(rootIdx + i) % 12]);
+  const rootPc = noteToPitchClass(rootNote);
+  if (rootPc === null) return [];
+  return scale.intervals.map(i => pitchClassToSharpName(rootPc + i));
 }
 
 export function getScaleById(id) {

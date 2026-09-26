@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>C2 — arnés de depuración: transporte, base generada y armonía</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+  section { border: 1px solid #444; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+  h2 { margin-top: 0; font-size: 1em; color: #ffd700; }
+  button { margin: 2px; padding: 6px 12px; cursor: pointer; }
+  #snapshot, #manual-snapshot { font-family: monospace; white-space: pre; background: #000; padding: 8px; border-radius: 4px; }
+  #log { font-family: monospace; font-size: 0.8em; height: 120px; overflow-y: auto; background: #000; padding: 8px; }
+  .diagram-box svg { width: 100%; height: auto; background: #222; }
+  input { padding: 4px; }
+</style>
+</head>
+<body>
+  <h1>Arnés C2 — no es la app final, solo para verificar el motor</h1>
+
+  <section>
+    <h2>Transporte + base generada (AudioContext, demo 32s a 120 BPM 4/4)</h2>
+    <button id="btn-play">▶ Play</button>
+    <button id="btn-pause">⏸ Pause</button>
+    <button id="btn-stop">■ Stop</button>
+    <button id="btn-seek0">Seek 0</button>
+    <button id="btn-seek16">Seek 16000ms (frontera de sección)</button>
+    <button id="btn-seekend">Seek al final</button>
+    <button id="btn-rate">Rate 1.5x (solo en pausa)</button>
+    <button id="btn-stress">100x play/pause/seek (stress)</button>
+    <button id="btn-dispose">Dispose</button>
+    <div id="snapshot">(sin iniciar)</div>
+  </section>
+
+  <section>
+    <h2>Modo manual + teclado (flechas = bloque siguiente/anterior, Espacio = play/pause nominal)</h2>
+    <p>Hacé click acá y probá las flechas. Un input de abajo debe IGNORAR las flechas (guard de foco).</p>
+    <div id="manual-snapshot">(sin iniciar)</div>
+    <input type="text" placeholder="las flechas acá no deben cambiar de bloque" style="width:320px">
+  </section>
+
+  <section>
+    <h2>Armonía: diapasón/piano real (harmony.js + chordDiagram.js)</h2>
+    <input id="chord-input" type="text" value="Am">
+    <input id="bass-input" type="text" placeholder="bajo explícito (opcional)">
+    <button id="btn-render-chord">Actualizar</button>
+    <div id="diagram-fretboard" class="diagram-box"></div>
+    <div id="diagram-piano" class="diagram-box"></div>
+    <div id="chord-info"></div>
+  </section>
+
+  <div id="log"></div>
+
+<script type="module">
+import { createTransport } from '/js/transport/transport.js';
+import { createGeneratedBackingAdapter } from '/js/transport/generatedBacking.js';
+import { createManualAdapter } from '/js/transport/manual.js';
+import { createInputActionListener, ACTIONS } from '/js/stage/inputActions.js';
+import { getBlocks, getActiveBlock, getActiveSection } from '/js/timeline/selectors.js';
+import { renderFretboard, renderPiano, getChordNotes } from '/js/rendering/chordDiagram.js';
+import { getChordTones } from '/js/music/harmony.js';
+
+const logEl = document.getElementById('log');
+function log(msg) {
+  const line = document.createElement('div');
+  line.textContent = `[${new Date().toISOString().slice(11, 23)}] ${msg}`;
+  logEl.prepend(line);
+}
+window.onerror = (msg) => log('ERROR: ' + msg);
+
+// --- Demo song (misma forma que docs/spec-v2/contratos/demo-original.song.json, resumida) ---
+const song = {
+  durationMs: 32000,
+  metadata: { bpm: 120, timeSignature: { numerator: 4, denominator: 4 } },
+  sections: [
+    { id: 'section-intro', type: 'intro', label: 'INTRO', startMs: 0, endMs: 4000 },
+    { id: 'section-verse', type: 'verse', label: 'VERSO', startMs: 4000, endMs: 16000 },
+    { id: 'section-chorus', type: 'chorus', label: 'ESTRIBILLO', startMs: 16000, endMs: 28000 },
+    { id: 'section-outro', type: 'outro', label: 'CIERRE', startMs: 28000, endMs: 32000 },
+  ],
+  lines: [
+    { id: 'line-1', sectionId: 'section-verse', startMs: 4000, endMs: 8000, text: 'Enciende la luz', tokens: [] },
+    { id: 'line-2', sectionId: 'section-verse', startMs: 8000, endMs: 12000, text: 'del camino', tokens: [] },
+  ],
+};
+
+// --- Sección 1: transporte + base generada ---
+let transport = null;
+let audioCtx = null;
+
+function snapshotText(t) {
+  const s = t.getSnapshot();
+  const section = getActiveSection(song, s.positionMs);
+  return `state=${s.state}  mode=${s.mode}  positionMs=${Math.round(s.positionMs)}  durationMs=${s.durationMs}  rate=${s.rate}\nsección activa: ${section ? section.label : '—'}`;
+}
+
+function ensureTransport() {
+  if (transport) return transport;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const adapter = createGeneratedBackingAdapter({ audioContext: audioCtx, metadata: song.metadata, volume: 0.3 });
+  transport = createTransport({ mode: 'generated', durationMs: song.durationMs, adapter });
+  transport.subscribe((snap) => {
+    document.getElementById('snapshot').textContent = snapshotText(transport);
+  });
+  document.getElementById('snapshot').textContent = snapshotText(transport);
+  log('Transporte creado (AudioContext state=' + audioCtx.state + ')');
+  return transport;
+}
+
+document.getElementById('btn-play').onclick = () => { ensureTransport().play(); log('play()'); };
+document.getElementById('btn-pause').onclick = () => { transport?.pause(); log('pause()'); };
+document.getElementById('btn-stop').onclick = () => { transport?.stop(); log('stop()'); };
+document.getElementById('btn-seek0').onclick = () => { transport?.seek(0); log('seek(0)'); };
+document.getElementById('btn-seek16').onclick = () => { transport?.seek(16000); log('seek(16000)'); };
+document.getElementById('btn-seekend').onclick = () => { transport?.seek(song.durationMs); log('seek(fin)'); };
+document.getElementById('btn-rate').onclick = () => { const ok = transport?.setRate(1.5); log('setRate(1.5) -> ' + ok); };
+document.getElementById('btn-dispose').onclick = () => { transport?.dispose(); log('dispose()'); };
+
+document.getElementById('btn-stress').onclick = () => {
+  const t = ensureTransport();
+  const before = performance.now();
+  for (let i = 0; i < 100; i++) {
+    t.play();
+    t.seek((i * 137) % song.durationMs);
+    t.pause();
+  }
+  log(`100x play/pause/seek en ${(performance.now() - before).toFixed(1)}ms, snapshot final: ${JSON.stringify(t.getSnapshot())}`);
+};
+
+// --- Sección 2: modo manual + teclado ---
+const manualTransport = createTransport({ mode: 'manual', durationMs: song.durationMs, adapter: createManualAdapter() });
+const blocks = getBlocks(song);
+function renderManualSnapshot() {
+  const snap = manualTransport.getSnapshot();
+  const block = getActiveBlock(blocks, snap.positionMs);
+  document.getElementById('manual-snapshot').textContent =
+    `positionMs=${snap.positionMs}  bloque activo: ${block ? (block.type === 'line' ? `línea "${block.line.text}"` : 'instrumental') + ` [${block.startMs}-${block.endMs}]` : '—'}`;
+}
+manualTransport.subscribe(renderManualSnapshot);
+renderManualSnapshot();
+
+createInputActionListener({
+  onAction(action) {
+    const snap = manualTransport.getSnapshot();
+    const idx = getActiveBlock(blocks, snap.positionMs) ? blocks.indexOf(getActiveBlock(blocks, snap.positionMs)) : -1;
+    if (action === ACTIONS.NEXT_BLOCK) {
+      const next = blocks[Math.min(blocks.length - 1, idx + 1)];
+      if (next) manualTransport.seek(next.startMs);
+      log('acción: next-block');
+    } else if (action === ACTIONS.PREV_BLOCK) {
+      const prev = blocks[Math.max(0, idx - 1)];
+      if (prev) manualTransport.seek(prev.startMs);
+      log('acción: prev-block');
+    } else if (action === ACTIONS.TOGGLE_PLAY) {
+      log('acción: toggle-play (modo manual, sin efecto de audio)');
+    } else if (action === ACTIONS.EXIT_STAGE) {
+      log('acción: exit-stage');
+    }
+  },
+});
+
+// --- Sección 3: armonía real ---
+function updateChordSection() {
+  const symbol = document.getElementById('chord-input').value;
+  const bass = document.getElementById('bass-input').value || undefined;
+  renderFretboard(document.getElementById('diagram-fretboard'), symbol);
+  renderPiano(document.getElementById('diagram-piano'), symbol);
+  const tones = getChordTones(symbol, bass);
+  const notesInfo = getChordNotes(symbol);
+  document.getElementById('chord-info').textContent =
+    `recognized=${tones.recognized}  root=${tones.root} (pc ${tones.rootPitchClass})  bass=${tones.bass ?? '—'} (pc ${tones.bassPitchClass ?? '—'})  tones(pc)=[${tones.tones.join(',')}]  notes=[${notesInfo.notes.join(',')}]`;
+}
+document.getElementById('btn-render-chord').onclick = updateChordSection;
+updateChordSection();
+
+log('Arnés listo.');
+</script>
+</body>
+</html>

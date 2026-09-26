@@ -25,6 +25,14 @@ export function mod12(n) {
   return ((n % 12) + 12) % 12;
 }
 
+/** Default spelling for a bare pitch class (0-11) with no key context. */
+export const PITCH_CLASS_NAMES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** @param {number} pitchClass 0-11 (mod12'd defensively) */
+export function pitchClassToSharpName(pitchClass) {
+  return PITCH_CLASS_NAMES_SHARP[mod12(pitchClass)];
+}
+
 /**
  * @param {string} note single-accidental spelling, e.g. "C#", "Bb"
  * @returns {number|null} pitch class 0-11, or null if not a recognized spelling
