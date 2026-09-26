@@ -82,7 +82,7 @@ function renderV2SongItem(song) {
   info.appendChild(buildBadge(`${song.metadata.bpm} BPM`));
   info.appendChild(buildBadge(song.timing.status === 'reviewed' ? 'Revisada' : 'Estimada'));
   const note = document.createElement('span');
-  note.textContent = 'Modo escenario completo (setlist, pedal, pantalla completa) todavía no conectado.';
+  note.textContent = 'Prompter v2 con audio, base o avance manual; setlist multi-canción pendiente.';
   note.style.cssText = 'font-size:0.85em;color:#6b7280;';
   info.appendChild(note);
   div.appendChild(info);

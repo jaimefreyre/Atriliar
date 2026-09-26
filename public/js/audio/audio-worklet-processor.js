@@ -1,0 +1,37 @@
+// This processor only frames and forwards PCM. Feature extraction and onset
+// detection happen in a Web Worker to keep the real-time audio thread light.
+class MicFrameProcessor extends AudioWorkletProcessor {
+  constructor(options) {
+    super();
+    const frameMs = options.processorOptions?.frameMs ?? 20;
+    this.frameSize = Math.max(128, Math.round(sampleRate * frameMs / 1000));
+    this.frame = new Float32Array(this.frameSize);
+    this.writeIndex = 0;
+    this.frameStart = 0;
+  }
+
+  process(inputs, outputs) {
+    const input = inputs[0];
+    const channels = input?.length ?? 0;
+    const frames = channels ? input[0].length : 128;
+    if (outputs[0]) for (const channel of outputs[0]) channel.fill(0);
+    if (!channels) { this.frameStart += frames; return true; }
+
+    for (let index = 0; index < frames; index++) {
+      let mono = 0;
+      for (let channel = 0; channel < channels; channel++) mono += input[channel][index] || 0;
+      this.frame[this.writeIndex++] = mono / channels;
+      if (this.writeIndex === this.frameSize) {
+        const pcm = this.frame;
+        this.port.postMessage({ type: 'frame', samples: pcm, currentFrame: this.frameStart,
+          sampleRate }, [pcm.buffer]);
+        this.frame = new Float32Array(this.frameSize);
+        this.writeIndex = 0;
+        this.frameStart += this.frameSize;
+      }
+    }
+    return true;
+  }
+}
+
+registerProcessor('stage-mic-frame-processor', MicFrameProcessor);

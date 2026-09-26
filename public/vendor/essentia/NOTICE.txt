@@ -1,0 +1,5 @@
+Essentia.js 0.1.3
+Source: https://github.com/MTG/essentia.js
+License: AGPL-3.0 (see LICENSE).
+The ESM WebAssembly build contains its binary in the JavaScript glue module.
+Copied by npm run vendor:essentia.

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spike micrófono y latencia · StagePrompter</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    body{background:#0c100d;color:#edf1e9}main{max-width:760px}h1{color:#f2f66f}.spike{padding:20px;border:1px solid #38443c;border-radius:12px;background:#151b17}.spike label{display:flex;align-items:center;gap:10px;margin:14px 0}.spike select,.spike button{font-size:16px;min-height:44px}.meter{padding:14px;background:#080b09;border:1px solid #39443c;border-radius:8px}.meter-track{height:10px;background:#252e28;border-radius:99px;overflow:hidden}.meter-fill{height:100%;width:0;background:#f2f66f;transition:width .12s linear}.status{min-height:5em;padding:12px;border-radius:8px;background:#090d0a;white-space:pre-wrap;font:14px/1.5 Consolas,monospace}.warning{border-left:3px solid #d3a257;padding-left:12px;color:#d5cdb9}.actions{display:flex;gap:10px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Spike técnico · micrófono y reloj</h1>
+    <p>Mide intervalos, nivel de señal, saturación y ataques. Compara micrófono con fuente silenciada, auriculares o altavoces.</p>
+    <section class="spike">
+      <label>Situación de referencia
+        <select id="setup"><option value="muted">Sin pista de referencia</option><option value="headphones">Referencia en auriculares</option><option value="speakers">Referencia en altavoces</option></select>
+      </label>
+      <div class="actions"><button type="button" id="start">Activar micrófono</button><button type="button" id="play" disabled>Iniciar pulso de prueba</button><button type="button" id="stop" disabled>Detener y apagar micrófono</button></div>
+      <p><label><input id="ready" type="checkbox"> Confirmo que estoy listo para escuchar el pulso si seleccioné altavoces.</label></p>
+      <div class="meter"><div><strong id="quality">Micrófono apagado</strong></div><p>RMS <span id="rms">—</span> · pico <span id="peak">—</span> · muestras saturadas <span id="clipped">—</span></p><div class="meter-track"><div id="meter" class="meter-fill"></div></div></div>
+      <p>Desvío respecto del pulso más cercano: <strong id="deviation">—</strong></p>
+      <pre class="status" id="status" role="status" aria-live="polite">No se solicita el micrófono hasta que pulses Activar.</pre>
+    </section>
+    <p class="warning">Los resultados dependen de la sala, ganancia automática, micrófono, intérprete y dispositivo. Son una observación puntual, no una garantía de precisión escénica. No se graba ni se transmite audio. La opción altavoces genera clic audible durante 10 segundos.</p>
+  </main>
+  <script type="module">
+    import { createMicCapture } from '../js/audio/micCapture.js';
+    import { getGridTimes } from '../js/timeline/grid.js';
+    const $ = (id) => document.getElementById(id);
+    let mic = null, refContext = null, source = null, timer = null, expectedPerf = [];
+    let frameCount = 0, lastPaint = 0, onsetOffsets = [], nextTarget = 0;
+    function captureFrame(frame) {
+      frameCount++;
+      if (frame.quality !== $('quality').dataset.quality) {
+        $('quality').dataset.quality = frame.quality;
+        $('quality').textContent = frame.quality === 'ok' ? 'Señal suficiente' : frame.quality === 'clipping' ? 'Señal saturada' : 'Señal baja';
+      }
+      const now = performance.now();
+      if (now - lastPaint >= 100) {
+        lastPaint = now; $('rms').textContent = frame.rms.toFixed(4);
+        $('peak').textContent = `${Math.round(frame.peak * 100)}%`;
+        $('clipped').textContent = `${(frame.clipRatio * 100).toFixed(2)}%`;
+        $('meter').style.width = `${Math.min(100, Math.round(frame.rms * 3500))}%`;
+      }
+      if (frame.onset && expectedPerf.length) {
+        const time = frame.observedPerfMs;
+        while (nextTarget < expectedPerf.length && expectedPerf[nextTarget] < time - 600) nextTarget++;
+        let target = expectedPerf[nextTarget] ?? null;
+        if (nextTarget > 0 && Math.abs(expectedPerf[nextTarget - 1] - time) < Math.abs((target ?? Infinity) - time)) target = expectedPerf[nextTarget - 1];
+        if (target !== null) {
+          const signed = Math.round(time - target); onsetOffsets.push(signed);
+          $('deviation').textContent = `${signed > 0 ? '+' : ''}${signed} ms · ${onsetOffsets.length} ataques medidos`;
+          if (time >= expectedPerf[nextTarget]) nextTarget++;
+        }
+      }
+    }
+    async function stopAll() {
+      clearInterval(timer); timer = null; source?.stop(); source?.disconnect(); source = null;
+      await refContext?.close().catch(() => {}); refContext = null;
+      await mic?.dispose(); mic = null; expectedPerf = []; nextTarget = 0;
+      $('start').disabled = false; $('play').disabled = true; $('stop').disabled = true;
+      $('status').textContent = `Detenido. Frames analizados: ${frameCount}. Ataques: ${onsetOffsets.length}. Desvío medio absoluto: ${onsetOffsets.length ? `${Math.round(onsetOffsets.reduce((a,b)=>a+Math.abs(b),0)/onsetOffsets.length)} ms` : 'sin ataques detectados'}.`;
+      $('quality').dataset.quality = ''; $('quality').textContent = 'Micrófono apagado';
+    }
+    $('start').addEventListener('click', async () => {
+      $('status').textContent = 'El navegador puede mostrar su solicitud de permiso para el micrófono.';
+      try {
+        mic = createMicCapture({ onFrame: captureFrame, onStatus: (s) => { if (s.message) $('status').textContent = s.message; } });
+        await mic.start(); $('start').disabled = true; $('stop').disabled = false; $('play').disabled = false;
+      } catch (error) { $('status').textContent = error.message; mic = null; }
+    });
+    $('play').addEventListener('click', async () => {
+      const setup = $('setup').value;
+      if (setup === 'speakers' && !$('ready').checked) { $('status').textContent = 'Activa la casilla para confirmar que estás listo para escuchar un clic por los altavoces.'; return; }
+      onsetOffsets = []; frameCount = 0; $('deviation').textContent = 'Esperando pulso…';
+      const total = getGridTimes({ bpm: 120, timeSignature: { numerator: 4, denominator: 4 }, durationMs: 10000 }).times.slice(0, 20);
+      if (setup === 'muted') { expectedPerf = total.map((ms) => performance.now() + ms); $('status').textContent = 'Micrófono activo; objetivo de pulso silencioso a 120 BPM durante 10 s.'; return; }
+      try {
+        refContext = new (window.AudioContext || window.webkitAudioContext)();
+        await refContext.resume();
+        const startAt = refContext.currentTime + .15;
+        expectedPerf = total.map((ms) => performance.now() + 150 + ms);
+        source = refContext.createBufferSource();
+        const audio = refContext.createBuffer(1, Math.ceil(refContext.sampleRate * 10), refContext.sampleRate);
+        const channel = audio.getChannelData(0);
+        for (const ms of total) for (let j=0; j<Math.min(500,channel.length-Math.round(ms*refContext.sampleRate/1000)); j++) channel[Math.round(ms*refContext.sampleRate/1000)+j] = Math.sin(2*Math.PI*880*j/refContext.sampleRate)*Math.exp(-j/75)*.32;
+        source.buffer = audio; source.connect(refContext.destination); source.start(startAt); $('status').textContent = setup === 'speakers' ? 'Clic audible por 10 s. Escucha y toca al ritmo.' : 'Pulso enviado por 10 s. Micrófono activo.';
+      } catch (error) { $('status').textContent = `No se pudo iniciar referencia de audio: ${error.message}`; }
+    });
+    $('stop').addEventListener('click', stopAll);
+    window.addEventListener('pagehide', () => { clearInterval(timer); source?.stop(); mic?.dispose(); refContext?.close(); });
+  </script>
+</body>
+</html>

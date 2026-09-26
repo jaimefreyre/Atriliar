@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Spike Essentia.js · StagePrompter</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    body{background:#0c100d;color:#edf1e9}main{max-width:780px}h1{color:#f2f66f}.spike-panel{padding:20px;border:1px solid #38443c;border-radius:12px;background:#151b17}label{display:block;margin:12px 0}.status{min-height:5em;padding:12px;border-radius:8px;background:#0a0d0b;white-space:pre-wrap;font:14px/1.5 Consolas,monospace}.limitation{border-left:3px solid #d3a257;padding-left:12px;color:#d5cdb9}button,input{font-size:16px;min-height:44px}.spike-results{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Spike técnico · análisis en Worker</h1>
+    <p>Carga la librería desde disco en un Worker de módulo, comprueba la versión WASM, tempo y onsets. La aplicación principal nunca importa Essentia estáticamente.</p>
+    <section class="spike-panel">
+      <label>Audio local <input id="file" type="file" accept="audio/*"></label>
+      <button type="button" id="fixture">Generar tono de prueba local · 120 BPM</button>
+      <button type="button" id="analyse" disabled>Analizar en el Worker</button>
+      <div class="spike-results"><p>Tempo detectado: <strong id="bpm">—</strong></p><p>Beats/onsets: <strong id="count">—</strong></p></div>
+      <pre class="status" id="status" role="status" aria-live="polite">Esperando archivo de audio de prueba.</pre>
+    </section>
+    <p class="limitation">Los estímulos sintéticos miden que el módulo funciona y reconocen un caso controlado; no validan música compleja ni rendimiento con todos los formatos. Este arnés no activa el micrófono.</p>
+    <p>Se ejecuta en <code>localhost</code>. La librería WASM se carga solo al pulsar Analizar. Audio y proceso permanecen en este dispositivo.</p>
+  </main>
+  <script type="module">
+    const $ = (id) => document.getElementById(id);
+    let sample = null;
+    let worker = null;
+    function makeClickFixture() {
+      const rate = 44100, seconds = 16, pcm = new Float32Array(rate * seconds);
+      for (let beat = 0; beat < seconds * 2; beat++) {
+        const start = Math.round(beat * rate * 0.5);
+        for (let i = 0; i < Math.min(3500, pcm.length - start); i++) {
+          const env = Math.exp(-i / 520);
+          const freq = beat % 2 === 0 ? 88 : 740;
+          pcm[start + i] += Math.sin(2 * Math.PI * freq * i / rate) * env * 0.72;
+        }
+      }
+      return { pcm, sampleRate: rate };
+    }
+    $('fixture').addEventListener('click', () => {
+      sample = makeClickFixture(); $('analyse').disabled = false;
+      $('status').textContent = 'Fixture sintético: 16 s, 120 BPM, 32 ataques. Listo para analizar.';
+      $('bpm').textContent = '—'; $('count').textContent = '—';
+    });
+    $('file').addEventListener('change', async (event) => {
+      const file = event.target.files?.[0]; if (!file) return;
+      $('status').textContent = `Decodificando ${file.name}…`;
+      try {
+        const context = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = await context.decodeAudioData(await file.arrayBuffer());
+        const pcm = new Float32Array(buffer.length);
+        for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+          const channelData = buffer.getChannelData(channel);
+          for (let i = 0; i < pcm.length; i++) pcm[i] += channelData[i] / buffer.numberOfChannels;
+        }
+        sample = { pcm, sampleRate: buffer.sampleRate };
+        await context.close(); $('analyse').disabled = false;
+        $('status').textContent = `${file.name} · ${Math.round(buffer.duration)} s · ${buffer.sampleRate} Hz · decodificado localmente.`;
+      } catch (error) { $('status').textContent = `No se pudo decodificar el archivo: ${error.message}`; }
+    });
+    $('analyse').addEventListener('click', () => {
+      if (!sample) return;
+      worker?.terminate();
+      worker = new Worker('../js/audio/essentiaAnalysisWorker.js', { type: 'module' });
+      worker.onmessage = ({ data }) => {
+        if (data.type === 'ready') { $('status').textContent = `Worker listo · Essentia ${data.version} · RhythmExtractor2013=${data.rhythm} · OnsetRate=${data.onsets}. Analizando…`; worker.postMessage({ ...sample, type: 'analyse' }, [sample.pcm.buffer]); }
+        else if (data.type === 'warning') $('status').textContent += `\n${data.message}`;
+        else if (data.type === 'analysis') { $('bpm').textContent = `${data.bpm.toFixed(1)} BPM`; $('count').textContent = `${data.beats.length} beats / ${data.onsets.length} onsets`; $('status').textContent = `Terminado · Essentia ${data.version} · confianza ${data.rhythmConfidence.toFixed(3)} · onset rate ${data.onsetRate.toFixed(2)} por segundo. PCM ${data.sampleRate} Hz.`; worker.terminate(); worker = null; }
+        else if (data.type === 'error') { $('status').textContent = `Error del Worker:\n${data.message}`; worker.terminate(); worker = null; }
+      };
+      worker.onerror = (error) => { $('status').textContent = `No se pudo iniciar el Worker: ${error.message}`; };
+      $('status').textContent = 'Cargando Essentia.js y WASM dentro del Worker…';
+      worker.postMessage({ type: 'init' });
+    });
+  </script>
+</body>
+</html>

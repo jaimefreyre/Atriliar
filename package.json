@@ -5,10 +5,12 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test tests/",
-    "build:validator": "node scripts/build-validator.cjs"
+    "build:validator": "node scripts/build-validator.cjs",
+    "vendor:essentia": "node scripts/vendor-essentia.cjs"
   },
   "devDependencies": {
     "ajv": "^8.20.0",
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "essentia.js": "^0.1.3"
   }
 }

@@ -3,7 +3,7 @@
  * escalas) and tablature panels (C5), all in the one reading/performance
  * view — per direction, this absorbs stageMode.js's (v1) panel features
  * into the v2 view instead of building a second, competing "stage" UI.
- * Fullscreen/Wake Lock/setlist are still pending (C6).
+ * Fullscreen/Wake Lock are still pending in C9; multi-song setlists remain deferred.
  */
 
 import { getAsset } from '../data/indexedDb.js';
@@ -19,6 +19,7 @@ import { renderAsciiTab } from '../rendering/tabRenderer.js';
 import { SCALES, SCALE_CATEGORIES } from '../music/scales.js';
 import { transposeChordSymbol } from '../music/harmony.js';
 import { el } from './dom.js';
+import { openPerformanceEvaluator } from './performanceEvaluator.js';
 
 const NOTE_ROOTS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -76,6 +77,13 @@ function renderTransportControls() {
   fineControls.appendChild(el('button', {
     className: 'btn-tiny', onclick: () => togglePanel('tabVisible'),
   }, ['≋ Tablatura']));
+  fineControls.appendChild(el('button', {
+    className: 'btn-tiny', id: 'player-evaluate', onclick: () => openPerformanceEvaluator({
+      song: current.song,
+      transport: current.transport,
+      onClose: () => document.getElementById('player-evaluate')?.focus(),
+    }),
+  }, ['🎙 Evaluar ritmo']));
   wrap.appendChild(fineControls);
   return wrap;
 }
