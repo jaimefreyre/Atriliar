@@ -1,9 +1,14 @@
-﻿{
+{
   "name": "stageprompter",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/musicEngine.test.js"
+    "test": "node tests/musicEngine.test.js && node --test tests/validation/",
+    "build:validator": "node scripts/build-validator.cjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "esbuild": "^0.28.2"
   }
 }

@@ -1,16 +1,118 @@
-﻿const DB_NAME = 'StagePrompterDB', DB_VERSION = 1, STORE_NAME = 'songs';
+const DB_NAME = 'StagePrompterDB';
+const DB_VERSION = 2;
+
+const STORE_SONGS = 'songs';       // v1 legacy, contenido intacto
+const STORE_SONGS_V2 = 'songsV2';
+const STORE_ASSETS = 'assets';
+const STORE_SETLISTS = 'setlists';
+const STORE_SETTINGS = 'settings';
+
 let dbPromise = null;
+
+function notifyDbEvent(kind, message) {
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('stageprompter:db', { detail: { kind, message } }));
+  }
+  console.warn(`[IndexedDB] ${kind}: ${message}`);
+}
+
 function getDB() {
   if (!dbPromise) {
     dbPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onupgradeneeded = (e) => { if (!e.target.result.objectStoreNames.contains(STORE_NAME)) e.target.result.createObjectStore(STORE_NAME, { keyPath: 'id' }); };
-      request.onsuccess = (e) => resolve(e.target.result);
+
+      // Solo crea stores acá; nunca migra datos dentro de onupgradeneeded.
+      // Idempotente para oldVersion 0 (DB nueva) y 1 (solo tenía 'songs').
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_SONGS)) db.createObjectStore(STORE_SONGS, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_SONGS_V2)) db.createObjectStore(STORE_SONGS_V2, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_SETLISTS)) db.createObjectStore(STORE_SETLISTS, { keyPath: 'id' });
+        if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
+      };
+
+      request.onsuccess = (e) => {
+        const db = e.target.result;
+        // Otra pestaña quiere subir de versión: cerrar acá para no bloquearla.
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+          notifyDbEvent('versionchange', 'La base de datos cambió en otra pestaña. Recargá esta página antes de guardar algo más.');
+        };
+        resolve(db);
+      };
+
       request.onerror = (e) => reject(e.target.error);
+
+      // Otra pestaña con una conexión vieja abierta impide la actualización.
+      request.onblocked = () => {
+        notifyDbEvent('blocked', 'Cerrá las otras pestañas de StagePrompter para poder actualizar la base de datos.');
+      };
     });
   }
   return dbPromise;
 }
-export async function saveSong(song) { const db = await getDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const req = tx.objectStore(STORE_NAME).put(song); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); }
-export async function getAllSongs() { const db = await getDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readonly'); const req = tx.objectStore(STORE_NAME).getAll(); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
-export async function deleteSong(id) { const db = await getDB(); return new Promise((res, rej) => { const tx = db.transaction(STORE_NAME, 'readwrite'); const req = tx.objectStore(STORE_NAME).delete(id); req.onsuccess = () => res(); req.onerror = () => rej(req.error); }); }
+
+/**
+ * Abre una transacción sobre un solo store, ejecuta `fn(store)` de forma
+ * síncrona (fn debe devolver el IDBRequest que emite, si emite alguno) y
+ * resuelve recién cuando la TRANSACCIÓN completa (no cuando el request
+ * individual tiene éxito) — así una escritura solo cuenta como guardada
+ * tras el commit real.
+ */
+function runInStore(storeName, mode, fn) {
+  return getDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(storeName, mode);
+    const store = tx.objectStore(storeName);
+    let result;
+    const request = fn(store);
+    if (request && typeof request === 'object' && 'onsuccess' in request) {
+      request.onsuccess = () => { result = request.result; };
+      request.onerror = () => reject(request.error);
+    } else {
+      result = request;
+    }
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new DOMException('Transacción abortada', 'AbortError'));
+  }));
+}
+
+// --- v1 legacy (sin cambios de comportamiento) ---
+
+export async function getAllSongs() {
+  return runInStore(STORE_SONGS, 'readonly', s => s.getAll());
+}
+export async function saveSong(song) {
+  return runInStore(STORE_SONGS, 'readwrite', s => s.put(song));
+}
+export async function deleteSong(id) {
+  return runInStore(STORE_SONGS, 'readwrite', s => s.delete(id));
+}
+
+// --- v2 ---
+
+export async function getAllSongsV2() {
+  return runInStore(STORE_SONGS_V2, 'readonly', s => s.getAll());
+}
+/** @returns {Promise<object|undefined>} undefined si no existe (chequeo de colisión sin transacción de escritura abierta) */
+export async function getSongV2(id) {
+  return runInStore(STORE_SONGS_V2, 'readonly', s => s.get(id));
+}
+export async function saveSongV2(song) {
+  return runInStore(STORE_SONGS_V2, 'readwrite', s => s.put(song));
+}
+export async function deleteSongV2(id) {
+  return runInStore(STORE_SONGS_V2, 'readwrite', s => s.delete(id));
+}
+
+// --- settings (preferencias, y hash de revisión local `review:<songId>`) ---
+
+export async function getSetting(key) {
+  const record = await runInStore(STORE_SETTINGS, 'readonly', s => s.get(key));
+  return record ? record.value : undefined;
+}
+export async function saveSetting(key, value) {
+  return runInStore(STORE_SETTINGS, 'readwrite', s => s.put({ key, value }));
+}

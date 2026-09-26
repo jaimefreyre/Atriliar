@@ -1,0 +1,466 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StagePrompter SongDocument v2",
+  "description": "Documento portable. Schema estructural estricto; requiere además las invariantes semánticas de CONTRATO-DATOS.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "metadata",
+    "durationMs",
+    "timing",
+    "audio",
+    "sections",
+    "lines",
+    "chords",
+    "tabs",
+    "sources",
+    "reviewWarnings"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "artist",
+        "key",
+        "bpm",
+        "timeSignature"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "artist": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-G](?:#|b)?m?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "timeSignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "numerator",
+            "denominator"
+          ],
+          "properties": {
+            "numerator": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 32
+            },
+            "denominator": {
+              "enum": [
+                1,
+                2,
+                4,
+                8,
+                16,
+                32
+              ]
+            }
+          }
+        }
+      }
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "notes"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "estimated",
+            "reviewed"
+          ]
+        },
+        "method": {
+          "enum": [
+            "grid",
+            "manual",
+            "aligned"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "audio": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assetId",
+            "offsetMs"
+          ],
+          "properties": {
+            "assetId": {
+              "$ref": "#/$defs/id"
+            },
+            "offsetMs": {
+              "$ref": "#/$defs/timeMs"
+            }
+          }
+        }
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "type",
+          "label",
+          "key",
+          "startMs",
+          "endMs"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "type": {
+            "enum": [
+              "intro",
+              "verse",
+              "prechorus",
+              "chorus",
+              "bridge",
+              "solo",
+              "instrumental",
+              "outro",
+              "other"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-G](?:#|b)?m?$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "endMs": {
+            "$ref": "#/$defs/timeMs"
+          }
+        }
+      }
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sectionId",
+          "startMs",
+          "endMs",
+          "text",
+          "tokens"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "sectionId": {
+            "$ref": "#/$defs/id"
+          },
+          "startMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "endMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "tokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "text",
+                "startMs",
+                "endMs",
+                "charStart",
+                "charEnd"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2000
+                },
+                "startMs": {
+                  "$ref": "#/$defs/timeMs"
+                },
+                "endMs": {
+                  "$ref": "#/$defs/timeMs"
+                },
+                "charStart": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "charEnd": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "chords": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "startMs",
+          "endMs",
+          "symbol",
+          "bassNote",
+          "anchor",
+          "scale"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "startMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "endMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "symbol": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\s\\u0000-\\u001f]+$"
+          },
+          "bassNote": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/note"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "anchor": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lineId",
+                  "charOffset"
+                ],
+                "properties": {
+                  "lineId": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "charOffset": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            ]
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "root",
+                  "id"
+                ],
+                "properties": {
+                  "root": {
+                    "$ref": "#/$defs/note"
+                  },
+                  "id": {
+                    "$ref": "#/$defs/scaleId"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "tabs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "sectionId",
+          "startMs",
+          "endMs",
+          "label",
+          "ascii"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "sectionId": {
+            "$ref": "#/$defs/id"
+          },
+          "startMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "endMs": {
+            "$ref": "#/$defs/timeMs"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "ascii": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20000
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "url",
+          "title",
+          "retrievedAt"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "maxLength": 2048
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "retrievedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "reviewWarnings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2000
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "timeMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "note": {
+      "type": "string",
+      "pattern": "^[A-G](?:#|b)?$"
+    },
+    "scaleId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    }
+  }
+}
