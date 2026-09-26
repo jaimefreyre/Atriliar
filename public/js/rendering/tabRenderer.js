@@ -1,4 +1,32 @@
-﻿export function renderTab(container, tabData, chordName = "") {
+﻿/**
+ * v2 tabs[] carry a pre-formatted ASCII block (CONTRATO-DATOS.md), not the
+ * legacy per-note {string,fret} array renderTab() below expects. Presented
+ * as text only — never interpreted as HTML, never transposed — synced by
+ * block (whole tab event active/inactive), not by individual note.
+ * @param {HTMLElement} container
+ * @param {{label:string, ascii:string}|null} tab null when no tab covers the current position
+ */
+export function renderAsciiTab(container, tab) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!tab) {
+    const empty = document.createElement('div');
+    empty.className = 'tab-empty';
+    empty.textContent = 'Sin tablatura en esta sección';
+    container.appendChild(empty);
+    return;
+  }
+  const label = document.createElement('div');
+  label.className = 'tab-ascii-label';
+  label.textContent = tab.label;
+  const pre = document.createElement('pre');
+  pre.className = 'tab-ascii';
+  pre.textContent = tab.ascii;
+  container.appendChild(label);
+  container.appendChild(pre);
+}
+
+export function renderTab(container, tabData, chordName = "") {
   if (!container) return;
   
   if (!tabData || tabData.length === 0) {

@@ -35,11 +35,13 @@ export function setActiveTab(tabData) {
   currentTabData = tabData;
 }
 
-function getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, chordPitchClasses) {
-  const isRoot = pitchClass === rootPitchClass;
-  const isBass = bassPitchClass !== null && pitchClass === bassPitchClass;
-  const inChord = chordPitchClasses.includes(pitchClass);
-  const inScale = currentScalePitchClasses.includes(pitchClass);
+const DEFAULT_LAYERS = { root: true, chord: true, bass: true, scale: true };
+
+function getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, chordPitchClasses, layers = DEFAULT_LAYERS) {
+  const isRoot = layers.root && pitchClass === rootPitchClass;
+  const isBass = layers.bass && bassPitchClass !== null && pitchClass === bassPitchClass;
+  const inChord = layers.chord && chordPitchClasses.includes(pitchClass);
+  const inScale = layers.scale && currentScalePitchClasses.includes(pitchClass);
 
   // Círculos pequeños para no superponerse. Una posición puede combinar
   // señales (p.ej. bajo que también pertenece al acorde); nunca se borra el
@@ -53,8 +55,8 @@ function getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, chordPitch
   return null;
 }
 
-export function renderFretboard(container, chordStr) {
-  const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr);
+export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined) {
+  const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr, bassOverride);
   const stringNames = ['E', 'A', 'D', 'G', 'B', 'E']; // 6ta a 1ra
   const frets = 22;
   const width = 900;
@@ -97,7 +99,7 @@ export function renderFretboard(container, chordStr) {
     for (let f = 0; f < frets; f++) {
       for (let s = 0; s < 6; s++) {
         const pitchClass = mod12(TUNING[s] + f);
-        const style = getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, tones);
+        const style = getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, tones, layers);
         if (style) allNotes.push({ f, s, pitchClass, style });
       }
     }
@@ -124,8 +126,8 @@ export function renderFretboard(container, chordStr) {
   container.innerHTML = svg;
 }
 
-export function renderPiano(container, chordStr) {
-  const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr);
+export function renderPiano(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined) {
+  const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr, bassOverride);
   const octaves = 2;
   const whiteNotes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
   const blackNotesMap = { 'C': 'C#', 'D': 'D#', 'F': 'F#', 'G': 'G#', 'A': 'A#' };
@@ -139,7 +141,7 @@ export function renderPiano(container, chordStr) {
 
   const getPianoStyle = (noteName) => {
     if (!recognized) return null;
-    return getPositionStyle(noteToPitchClass(noteName), rootPitchClass, bassPitchClass, tones);
+    return getPositionStyle(noteToPitchClass(noteName), rootPitchClass, bassPitchClass, tones, layers);
   };
 
   for (let o = 0; o < octaves; o++) {

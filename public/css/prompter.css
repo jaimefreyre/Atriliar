@@ -85,3 +85,15 @@
 @media (prefers-reduced-motion: reduce) {
   .prompter-screen * { transition: none !important; animation: none !important; }
 }
+
+/* Paneles de armonía/tablatura del reproductor (C5) */
+#player-view .panel {
+  background: #141817; border: 1px solid var(--prompter-line); border-radius: 10px; overflow: hidden;
+}
+#player-view select {
+  background: #1c2320; color: #eee; border: 1px solid #59685f; border-radius: 6px; padding: 4px 8px;
+}
+#player-view .diagram-svg { width: 100%; height: auto; }
+.tab-empty { color: #8b988e; font-size: 0.85em; font-style: italic; }
+.tab-ascii-label { color: #a6b1aa; font-size: 0.8em; margin-bottom: 6px; }
+.tab-ascii { color: #c1d1c2; font-family: Consolas, "Courier New", monospace; font-size: 0.85em; white-space: pre; overflow-x: auto; margin: 0; }
