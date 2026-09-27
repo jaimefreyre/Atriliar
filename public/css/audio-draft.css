@@ -221,3 +221,33 @@
 .fretboard-spectral-pitch{pointer-events:help}
 .lab-transport .harmonic-history-host .harmonic-history-heading{max-height:22px;overflow:hidden}
 @media(max-width:620px){.lab-transport{grid-template-columns:1fr;grid-template-rows:58px auto auto auto}.lab-transport .analysis-waveform{grid-column:1;grid-row:1}.lab-transport .audio-study-player{grid-column:1;grid-row:2}.lab-transport .harmonic-history-host{grid-column:1;grid-row:3}.lab-transport-status{grid-column:1;grid-row:4}.harmonic-history-heading h4{font-size:.65rem}.harmonic-history-canvas{height:110px}}
+
+.harmonic-history-heading{flex-wrap:wrap}
+.lab-transport .harmonic-history-host .harmonic-history-heading{max-height:none;overflow:visible}
+.harmonic-dashboard{grid-template-columns:minmax(0,1fr)}
+.harmonic-history-controls{display:flex;align-items:center;gap:.2rem;flex-wrap:wrap}
+.harmonic-voice-toggle{padding:.08rem .3rem;border:1px solid #394a40;border-radius:4px;background:#101a14;color:#748178;font:600 .57rem ui-monospace,Consolas,monospace;cursor:pointer}
+.harmonic-voice-toggle[aria-pressed=true]{color:#eff5e8;background:#17241c}
+.harmonic-voice-toggle.voice-0[aria-pressed=true]{border-color:#f2a45d;color:#f8b675}
+.harmonic-voice-toggle.voice-1[aria-pressed=true]{border-color:#56d9c4;color:#72e1cf}
+.harmonic-voice-toggle.voice-2[aria-pressed=true]{border-color:#e583bd;color:#f19bcb}
+.harmonic-history-dock{position:relative}
+.harmonic-history-tooltip{position:absolute;z-index:12;max-width:220px;padding:.25rem .4rem;border:1px solid #748b7a;border-radius:5px;background:#050907ed;color:#f5f8ed;box-shadow:0 3px 12px #000a;font:600 .63rem ui-monospace,Consolas,monospace;pointer-events:none;white-space:nowrap}
+.harmonic-history-tooltip[hidden]{display:none}
+.analysis-title-row{align-items:flex-start}
+.analysis-circle-widget-host{width:140px;min-width:140px;flex:0 0 140px}
+.harmonic-circle-widget{width:100%;padding:.2rem;border:1px solid #33473b;border-radius:8px;background:#08110d}
+.harmonic-circle-widget .harmonic-circle-column{padding:.12rem;border:0;background:transparent}
+.harmonic-circle-widget .harmonic-circle-column h5{margin:0;text-align:center;font-size:.64rem}
+.harmonic-circle-widget .harmonic-wheel-wrap{width:134px;max-width:100%;margin:0 auto}
+.harmonic-circle-widget .harmonic-wheel-note{font-size:12px}
+.harmonic-circle-widget .harmonic-wheel-legend{display:none}
+.harmonic-circle-widget .harmonic-chord-hub{width:34%;min-width:48px;max-width:62px;padding:.18rem;gap:.05rem}
+.harmonic-circle-widget .harmonic-chord-name{font-size:.83rem}
+.harmonic-circle-widget .harmonic-chord-quality{font-size:.46rem}
+.harmonic-circle-widget .harmonic-chord-notes{gap:.07rem}
+.harmonic-circle-widget .harmonic-note-chip{min-width:13px;height:13px;padding:0 .1rem;font-size:.43rem}
+.harmonic-radar-grid{fill:none;stroke:rgba(190,219,201,.28);stroke-width:.8}
+.harmonic-radar-axis{stroke:rgba(190,219,201,.14);stroke-width:.55}
+.harmonic-radar-area{fill:rgba(91,220,197,.23);stroke:#65dcca;stroke-width:1.7;stroke-linejoin:round}
+@media(max-width:620px){.analysis-circle-widget-host{width:118px;min-width:118px;flex-basis:118px}.harmonic-circle-widget .harmonic-wheel-wrap{width:112px}.harmonic-circle-widget .harmonic-wheel-note{font-size:11px}.harmonic-history-heading{align-items:flex-start}.harmonic-history-legend{width:100%;justify-content:flex-start}}

@@ -72,18 +72,21 @@ function getChordPitches(segment, frame) {
 }
 
 /** Circle-of-fifths plus a time-aligned spectral map for the selected analysis. */
-export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0 }) {
+export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0, visibleVoices = [true, true, true] }) {
   const root = makeNode('section', 'harmonic-dashboard');
-  root.setAttribute('aria-label', 'Círculo de quintas y picos del tramo actual');
+  root.setAttribute('aria-label', 'Picos espectrales del tramo actual');
+  const circleElement = makeNode('section', 'harmonic-circle-widget');
+  circleElement.setAttribute('aria-label', 'Círculo de quintas con radar de energía cromática');
   const circleColumn = makeNode('div', 'harmonic-circle-column');
   const circleTitle = makeNode('h5', '', 'Círculo de quintas');
-  const svg = makeSvg('svg', { class: 'harmonic-fifths-svg', viewBox: '0 0 280 280', role: 'img', 'aria-labelledby': 'harmonic-wheel-title harmonic-wheel-desc' });
-  const svgTitle = makeSvg('title', { id: 'harmonic-wheel-title' }); svgTitle.textContent = 'Círculo de quintas y notas del acorde';
-  const svgDesc = makeSvg('desc', { id: 'harmonic-wheel-desc' }); svgDesc.textContent = 'La rueda resalta las notas con energía en el tramo actual. Los puntos naranjas muestran graves y los turquesa notas agudas.';
+  const svg = makeSvg('svg', { class: 'harmonic-fifths-svg', viewBox: '0 0 220 220', role: 'img', 'aria-labelledby': 'harmonic-wheel-title harmonic-wheel-desc' });
+  const svgTitle = makeSvg('title', { id: 'harmonic-wheel-title' }); svgTitle.textContent = 'Círculo de quintas con radar de cromas y notas del acorde';
+  const svgDesc = makeSvg('desc', { id: 'harmonic-wheel-desc' }); svgDesc.textContent = 'El anillo exterior marca las notas del círculo de quintas y el radar interior muestra la energía cromática del tramo.';
   svg.append(svgTitle, svgDesc);
   const ringGroup = makeSvg('g');
+  const radarGroup = makeSvg('g');
   const pointsGroup = makeSvg('g');
-  svg.append(ringGroup, pointsGroup);
+  svg.append(ringGroup, radarGroup, pointsGroup);
   const chordHub = makeNode('div', 'harmonic-chord-hub');
   const chordName = makeNode('strong', 'harmonic-chord-name', '—');
   const chordQuality = makeNode('span', 'harmonic-chord-quality', 'sin acorde claro');
@@ -97,6 +100,7 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     makeNode('span', '', 'Anillo: energía de nota'),
   );
   circleColumn.append(circleTitle, wheel, wheelLegend);
+  circleElement.append(circleColumn);
 
   const spectrumColumn = makeNode('div', 'harmonic-spectrum-column');
   const spectrumHeading = makeNode('div', 'harmonic-spectrum-heading');
@@ -112,27 +116,65 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
   historyElement.setAttribute('aria-label', 'Recorrido armónico a lo largo de la canción');
   const historyHeading = makeNode('div', 'harmonic-history-heading');
   historyHeading.append(makeNode('h4', '', 'Recorrido armónico · alturas probables del acorde'));
+  const historyControls = makeNode('div', 'harmonic-history-controls');
+  const voiceButtons = [];
+  const voiceLabels = ['Grave', 'Media', 'Aguda'];
+  voiceLabels.forEach((label, index) => {
+    const button = makeNode('button', `harmonic-voice-toggle voice-${index}`, label);
+    button.type = 'button'; button.setAttribute('aria-pressed', String(Boolean(visibleVoices[index])));
+    button.setAttribute('aria-label', `Mostrar u ocultar línea ${label.toLowerCase()}`);
+    button.addEventListener('click', () => {
+      visibleVoices[index] = !visibleVoices[index];
+      button.setAttribute('aria-pressed', String(visibleVoices[index]));
+      drawHarmonicHistory();
+    });
+    voiceButtons.push(button); historyControls.append(button);
+  });
+  historyHeading.append(historyControls);
   const historyLegend = makeNode('div', 'harmonic-history-legend');
   historyHeading.append(historyLegend);
   const historyCanvas = makeNode('canvas', 'harmonic-history-canvas');
   historyCanvas.setAttribute('role', 'img');
   historyCanvas.setAttribute('aria-label', 'Tres líneas muestran las alturas probables de las notas del acorde a lo largo de la canción. El eje vertical empieza en la nota más grave detectada.');
   historyElement.append(historyHeading, historyCanvas);
+  const historyTooltip = makeNode('div', 'harmonic-history-tooltip');
+  historyTooltip.hidden = true;
+  historyElement.append(historyTooltip);
 
   let resizeObserver = null;
   let currentSegment = segment;
   let currentPositionMs = playbackPositionMs;
   let liveFrame = null;
   let lastHistoryDraw = 0;
+  let historyPlot = null;
 
   function updateCircle(nextSegment, frame) {
-    ringGroup.replaceChildren(); pointsGroup.replaceChildren(); chordNotes.replaceChildren();
+    ringGroup.replaceChildren(); radarGroup.replaceChildren(); pointsGroup.replaceChildren(); chordNotes.replaceChildren();
     const symbol = nextSegment?.selectedSymbol || nextSegment?.symbol || '';
     const chord = getChordTones(symbol);
     const chordPitchClasses = new Set(chord.tones);
     const rootPitchClass = chord.rootPitchClass;
     const chroma = nextSegment?.chroma || [];
-    const center = 140, inner = 98, outer = 118, labelRadius = 132;
+    const center = 110, inner = 81, outer = 98, labelRadius = 108;
+    const radarRadius = 70;
+    for (const level of [.25, .5, .75, 1]) {
+      const grid = FIFTHS.map((pc, index) => {
+        const angle = -Math.PI / 2 + index * Math.PI / 6;
+        const radius = radarRadius * level;
+        return polar(center, center, radius, angle).join(',');
+      }).join(' ');
+      radarGroup.append(makeSvg('polygon', { points: grid, class: 'harmonic-radar-grid' }));
+    }
+    for (let index = 0; index < 12; index++) {
+      const angle = -Math.PI / 2 + index * Math.PI / 6;
+      const [x, y] = polar(center, center, radarRadius, angle);
+      radarGroup.append(makeSvg('line', { x1: center, y1: center, x2: x, y2: y, class: 'harmonic-radar-axis' }));
+    }
+    const radarPoints = FIFTHS.map((pc, index) => {
+      const angle = -Math.PI / 2 + index * Math.PI / 6;
+      return polar(center, center, Math.max(3, clamp(chroma[pc], 0, 1) * radarRadius), angle).join(',');
+    }).join(' ');
+    radarGroup.append(makeSvg('polygon', { points: radarPoints, class: 'harmonic-radar-area' }));
     for (let index = 0; index < 12; index++) {
       const pc = FIFTHS[index];
       const angle = -Math.PI / 2 + index * Math.PI / 6;
@@ -161,7 +203,7 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
       const wheelIndex = FIFTHS.indexOf(pc);
       const angle = -Math.PI / 2 + wheelIndex * Math.PI / 6;
       const octave = Math.floor(peak.midi / 12) - 1;
-      const radius = clamp(54 + (octave - 2) * 10, 48, 94);
+      const radius = clamp(39 + (octave - 2) * 7, 34, 76);
       const [x, y] = polar(center, center, radius, angle);
       const strength = clamp(peak.strength, .08, 1);
       const register = peak.midi < 60 ? 'bass' : 'high';
@@ -222,6 +264,7 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     const maxMidi = allAudioMidi.length ? Math.max(...allAudioMidi) : (usedPitches.length ? Math.max(...usedPitches) : minMidi + 12);
     const pitchRange = Math.max(12, maxMidi - minMidi);
     const yFor = (midi) => bottom - (midi - minMidi) / pitchRange * plotHeight;
+    historyPlot = { left, right, top, bottom, width, height, duration, plotWidth, plotHeight, minMidi, pitchRange, notesByFrame };
     ctx.font = '8px system-ui,sans-serif'; ctx.textAlign = 'right';
     for (const midi of usedPitches) {
       const y = yFor(midi);
@@ -238,6 +281,7 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     }
     const voiceColors = ['#f2a45d', '#56d9c4', '#e583bd'];
     for (let voice = 0; voice < 3; voice++) {
+      if (!visibleVoices[voice]) continue;
       ctx.beginPath(); let drawing = false;
       notesByFrame.forEach(({ timeMs, notes }) => {
         const note = notes[voice];
@@ -247,6 +291,23 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
         if (!drawing) { ctx.moveTo(x, y); drawing = true; } else ctx.lineTo(x, y);
       });
       ctx.strokeStyle = voiceColors[voice]; ctx.lineWidth = 2; ctx.globalAlpha = .9; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    const visibleIndexes = visibleVoices.map((visible, index) => visible ? index : -1).filter((index) => index >= 0);
+    if (visibleIndexes.length === 1) {
+      const voice = visibleIndexes[0];
+      let lastLabeledMidi = null, lastLabelX = -Infinity;
+      ctx.font = '700 9px system-ui,sans-serif'; ctx.textAlign = 'left';
+      notesByFrame.forEach(({ timeMs, notes }) => {
+        const note = notes[voice];
+        if (!note) return;
+        const x = left + clamp(timeMs / duration, 0, 1) * plotWidth;
+        const y = yFor(note.midi);
+        if (note.midi !== lastLabeledMidi && x - lastLabelX >= 40) {
+          ctx.lineWidth = 3; ctx.strokeStyle = '#08110d'; ctx.strokeText(peakName(note), x + 3, y - 4);
+          ctx.fillStyle = voiceColors[voice]; ctx.fillText(peakName(note), x + 3, y - 4);
+          lastLabelX = x; lastLabeledMidi = note.midi;
+        }
+      });
     }
     const active = currentSegment;
     if (active) {
@@ -264,7 +325,48 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     historyLegend.replaceChildren();
     currentPitches.slice(0, 3).forEach((pitch, index) => historyLegend.append(makeNode('span', `harmonic-voice-chip voice-${index}`, peakName(pitch))));
     if (!currentPitches.length) historyLegend.append(makeNode('span', 'harmonic-history-empty', 'Sin acorde definido para este tramo'));
+    voiceButtons.forEach((button, index) => {
+      const note = currentPitches[index];
+      button.textContent = `${voiceLabels[index]}${note ? ` ${peakName(note)}` : ''}`;
+      button.setAttribute('aria-label', `Mostrar u ocultar línea ${voiceLabels[index].toLowerCase()}${note ? ` · ${peakName(note)}` : ''}`);
+    });
   }
+
+  function onHistoryPointerMove(event) {
+    if (!historyPlot || !visibleVoices.some(Boolean)) { historyTooltip.hidden = true; return; }
+    const rect = historyCanvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    if (x < historyPlot.left || x > historyPlot.right || y < historyPlot.top || y > historyPlot.bottom) {
+      historyTooltip.hidden = true; return;
+    }
+    const timeMs = (x - historyPlot.left) / historyPlot.plotWidth * historyPlot.duration;
+    const points = historyPlot.notesByFrame;
+    let low = 0, high = points.length - 1;
+    while (low < high) { const middle = (low + high) >> 1; if (points[middle].timeMs < timeMs) low = middle + 1; else high = middle; }
+    let best = null;
+    for (const pointIndex of [Math.max(0, low - 1), low, Math.min(points.length - 1, low + 1)]) {
+      const point = points[pointIndex];
+      if (!point) continue;
+      for (let voice = 0; voice < 3; voice++) {
+        const note = visibleVoices[voice] ? point.notes[voice] : null;
+        if (!note) continue;
+        const noteY = historyPlot.bottom - (note.midi - historyPlot.minMidi) / historyPlot.pitchRange * historyPlot.plotHeight;
+        const distance = Math.abs(noteY - y);
+        if (!best || distance < best.distance) best = { note, voice, distance };
+      }
+    }
+    if (!best || best.distance > 11) { historyTooltip.hidden = true; historyCanvas.style.cursor = 'crosshair'; return; }
+    const chord = analysis.chordCandidates.find((part) => timeMs >= part.startMs && timeMs < part.endMs);
+    const strength = Math.round(clamp(best.note.strength, 0, 1) * 100);
+    historyTooltip.textContent = `${peakName(best.note)} · ${Math.floor(timeMs / 60000)}:${String(Math.floor(timeMs / 1000) % 60).padStart(2, '0')} · ${chord?.selectedSymbol || chord?.symbol || 'sin acorde'} · intensidad ${strength}%`;
+    historyTooltip.style.left = `${Math.min(historyPlot.width - 220, Math.max(4, x + 10))}px`;
+    historyTooltip.style.top = `${Math.max(26, y - 25)}px`;
+    historyTooltip.hidden = false; historyCanvas.style.cursor = 'pointer';
+  }
+
+  historyCanvas.addEventListener('pointermove', onHistoryPointerMove);
+  historyCanvas.addEventListener('pointerleave', () => { historyTooltip.hidden = true; historyCanvas.style.cursor = 'crosshair'; });
 
   function update(nextSegment = currentSegment, positionMs = currentPositionMs, nextLiveFrame = liveFrame) {
     currentSegment = nextSegment;
@@ -295,5 +397,5 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
   resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { lastHistoryDraw = 0; drawHarmonicHistory(); }) : null;
   resizeObserver?.observe(root); resizeObserver?.observe(historyElement);
   requestAnimationFrame(() => { lastHistoryDraw = 0; drawHarmonicHistory(); });
-  return { element: root, historyElement, historyCanvas, update, dispose: () => resizeObserver?.disconnect() };
+  return { element: root, circleElement, historyElement, historyCanvas, update, dispose: () => resizeObserver?.disconnect() };
 }

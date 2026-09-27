@@ -17,10 +17,12 @@ completo sin agregar campos experimentales al documento portable.
    Debajo de la forma de onda y el reproductor, el recorrido armónico dibuja tres líneas
    con las alturas probables de las notas del acorde a lo largo de toda la pista. El eje
    parte de la nota más grave detectada; sus marcas laterales indican notas usadas, y
-   al pulsar un punto se escucha ese tramo. En el diapasón, los círculos magenta marcan
-   las notas/octavas dominantes del FFT; el resto de colores conserva las posiciones
-   teóricas de acorde, bajo y escala. Debajo del diapasón, el círculo de quintas resalta
-   la energía y las notas del acorde. Los proyectos anteriores usan sus picos por pulso.
+   al pulsar un punto se escucha ese tramo. Los controles Grave/Media/Aguda aíslan
+   cada línea; al pasar el puntero se identifica la nota y, con una sola línea visible,
+   sus cambios quedan rotulados. En el diapasón, los círculos magenta marcan las
+   notas/octavas dominantes del FFT; el resto conserva las posiciones teóricas de acorde,
+   bajo y escala. El círculo de quintas con radar de croma está en la cabecera del mapa,
+   donde estaban las ayudas contextuales. Los proyectos anteriores usan sus picos por pulso.
 4. **Dividir aquí** crea otra sección en el tramo seleccionado. En cada sección se
    puede escribir nombre, tipo, letra y tablatura ASCII.
 5. El laboratorio se guarda localmente con su audio y puede reabrirse desde la

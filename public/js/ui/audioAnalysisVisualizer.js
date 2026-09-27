@@ -46,11 +46,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   root.setAttribute('aria-labelledby', 'analysis-studio-title');
   const heading = node('h3', '', 'Mapa de análisis de la canción'); heading.id = 'analysis-studio-title';
   const titleRow = node('div', 'analysis-title-row');
-  titleRow.append(heading);
-  const guide = node('button', 'analysis-help-tip', '?');
-  guide.type = 'button'; guide.dataset.tip = 'El mapa muestra energía de notas y picos armónicos. Un pico puede ser un armónico de otra nota; las sugerencias son aproximaciones que puedes corregir.';
-  guide.setAttribute('aria-label', guide.dataset.tip);
-  titleRow.append(guide); root.append(titleRow);
+  const circleWidgetHost = node('div', 'analysis-circle-widget-host');
+  titleRow.append(heading, circleWidgetHost); root.append(titleRow);
 
   const modeLabel = node('label', 'analysis-mode-label', 'Vista global ');
   const mode = node('select', 'analysis-mode');
@@ -66,9 +63,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   }
   grouping.value = '4';
   groupingLabel.append(grouping); toolbar.append(groupingLabel);
-  const rhythmGuide = node('button', 'analysis-help-tip', '?');
-  rhythmGuide.type = 'button'; rhythmGuide.dataset.tip = 'Las líneas finas marcan pulsos; las gruesas indican compases según el agrupamiento elegido. Cámbialo si no coincide con la métrica de la canción.';
-  rhythmGuide.setAttribute('aria-label', rhythmGuide.dataset.tip); toolbar.append(rhythmGuide); root.append(toolbar);
+  root.append(toolbar);
 
   const waveformCanvas = node('canvas', 'analysis-waveform');
   waveformCanvas.setAttribute('aria-label', 'Forma de onda de toda la pista. Selecciona un punto para escuchar el pasaje.');
@@ -101,6 +96,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   let activeInstrument = 'guitar';
   let refreshSpectralOverlay = () => {};
   let lastSpectralPitchSignature = '';
+  const visibleHarmonicVoices = [true, true, true];
 
   function drawWaveform() {
     const rect = waveformCanvas.getBoundingClientRect();
@@ -241,6 +237,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   function renderDetail() {
     list.replaceChildren(); detail.replaceChildren();
     harmonicHistoryHost.replaceChildren();
+    circleWidgetHost.replaceChildren();
     refreshSpectralOverlay = () => {};
     lastSpectralPitchSignature = '';
     const segments = analysis.chordCandidates || [];
@@ -368,8 +365,9 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       button.addEventListener('click', () => { activeInstrument = id; renderDetail(); });
       instrumentNav.append(button);
     });
-    harmonicVisualization = createHarmonicCircle({ analysis, segment, playbackPositionMs });
+    harmonicVisualization = createHarmonicCircle({ analysis, segment, playbackPositionMs, visibleVoices: visibleHarmonicVoices });
     harmonicHistoryHost.replaceChildren(harmonicVisualization.historyElement);
+    circleWidgetHost.replaceChildren(harmonicVisualization.circleElement);
     harmonicVisualization.historyCanvas.addEventListener('click', (event) => selectAtCanvas(event, harmonicVisualization.historyCanvas, 58, 70));
     instrumentPanel.append(instrumentNav, drawing, spectralLegend, harmonicVisualization.element);
     renderInstrument();
@@ -427,6 +425,6 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   return { element: root, waveformCanvas, historyElement: harmonicHistoryHost, redraw: drawOverview, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
     setPlaybackPosition, setLiveFrame, setAuditionStatus, selectSegmentAt, refreshDetail: renderDetail,
-    dispose: () => { resizeObserver?.disconnect(); harmonicVisualization?.dispose(); harmonicHistoryHost.replaceChildren(); },
+    dispose: () => { resizeObserver?.disconnect(); harmonicVisualization?.dispose(); harmonicHistoryHost.replaceChildren(); circleWidgetHost.replaceChildren(); },
     getSelectedSegment: () => analysis.chordCandidates[selectedIndex] || null };
 }

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v20-pitch-visualizer-cleanup';
+const SHELL_CACHE = 'stageprompter-shell-v21-harmonic-history-radar';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
