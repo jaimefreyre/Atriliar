@@ -51,16 +51,12 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
   const chromaFrames = [];
   for (let offset = 0; offset + frameSize <= pcm44100.length; offset += hopSize) {
     const startSec = (offset + frameSize / 2) / 44100;
-    const frame = essentia.arrayToVector(pcm44100.slice(offset, offset + frameSize));
-    let windowed, spectrum, peaks, hpcp;
+    let frame, windowed, spectrum, peaks, hpcp;
     try {
+      frame = essentia.arrayToVector(pcm44100.slice(offset, offset + frameSize));
       windowed = essentia.Windowing(frame, true, frameSize, 'hann', 0, true);
       spectrum = essentia.Spectrum(windowed.frame, frameSize);
       peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.0001, 5000, 100, 55, 'frequency', 44100);
-      hpcp = essentia.HPCP(peaks.frequencies, peaks.magnitudes);
-      // Essentia HPCP bins are A..G#; the application contract uses C..B.
-      const fromA = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
-      const cMajorOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => fromA[index] || 0);
       const peakFrequencies = Array.from(essentia.vectorToArray(peaks.frequencies), Number);
       const peakMagnitudes = Array.from(essentia.vectorToArray(peaks.magnitudes), Number);
       const spectralPeaks = peakFrequencies.flatMap((frequencyHz, index) => {
@@ -68,7 +64,19 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
         const midi = 69 + 12 * Math.log2(frequencyHz / 440);
         return [{ ...describeMidi(midi), frequencyHz, magnitude: peakMagnitudes[index] }];
       }).sort((a, b) => b.magnitude - a.magnitude).slice(0, 24);
-      chromaFrames.push({ timeSec: startSec, chroma: cMajorOrder, spectralPeaks });
+      // HPCP rejects empty peak vectors. Silence and very low-level passages
+      // are normal in real recordings, so retain a neutral frame and continue.
+      let chroma = Array(12).fill(0);
+      if (peakFrequencies.length && peakMagnitudes.some((magnitude) => Number.isFinite(magnitude) && magnitude > 0)) {
+        hpcp = essentia.HPCP(peaks.frequencies, peaks.magnitudes);
+        // Essentia HPCP bins are A..G#; the application contract uses C..B.
+        const fromA = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
+        chroma = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => fromA[index] || 0);
+      }
+      chromaFrames.push({ timeSec: startSec, chroma, spectralPeaks });
+    } catch {
+      // One malformed/empty FFT window must not discard the rest of a song.
+      chromaFrames.push({ timeSec: startSec, chroma: Array(12).fill(0), spectralPeaks: [] });
     } finally {
       hpcp?.hpcp?.delete?.(); peaks?.frequencies?.delete?.(); peaks?.magnitudes?.delete?.();
       spectrum?.spectrum?.delete?.(); windowed?.frame?.delete?.(); frame?.delete?.();
@@ -148,7 +156,7 @@ self.onmessage = async ({ data }) => {
         ({ events: chordSuggestions, candidates: chordCandidates, spectralFrames } = estimateChordEvents(essentia, pcm44100, beats,
           Math.round(pcm44100.length / 44100 * 1000), Number(rhythm.bpm)));
       }
-      catch (error) { self.postMessage({ type: 'warning', message: `Análisis de acordes no disponible: ${error.message}` }); }
+      catch (error) { self.postMessage({ type: 'warning', message: `Análisis de acordes no disponible: ${error?.message || String(error)}` }); }
       self.postMessage({ type: 'analysis', version: essentia.version, sampleRate: 44100,
         durationMs: Math.round(pcm44100.length / 44100 * 1000), bpm: Number(rhythm.bpm),
         rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates, spectralFrames });
