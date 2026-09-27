@@ -250,4 +250,15 @@
 .harmonic-radar-grid{fill:none;stroke:rgba(190,219,201,.28);stroke-width:.8}
 .harmonic-radar-axis{stroke:rgba(190,219,201,.14);stroke-width:.55}
 .harmonic-radar-area{fill:rgba(91,220,197,.23);stroke:#65dcca;stroke-width:1.7;stroke-linejoin:round}
+.live-harmonic-radar{display:flex;align-items:center;gap:.65rem;margin:.45rem 0;padding:.45rem .6rem;border:1px solid #394b3f;border-radius:8px;background:#0d1711}
+.live-harmonic-radar h4{flex:0 0 auto;margin:0;color:#eff5e8;font-size:.8rem}
+.live-harmonic-radar-wrap{position:relative;width:164px;height:164px;flex:0 0 164px}
+.live-harmonic-radar-wrap svg{display:block;width:100%;height:100%;overflow:visible}
+.live-harmonic-radar .harmonic-radar-area{fill:rgba(91,220,197,.3);stroke:#65dcca;stroke-width:2}
+.live-harmonic-radar .harmonic-radar-area.live{filter:drop-shadow(0 0 2px #65dcca88)}
+.live-harmonic-radar-hub{position:absolute;inset:37% 37%;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:1px solid #435747;border-radius:50%;background:#111b15;text-align:center}
+.live-harmonic-radar-hub strong{font-size:.8rem;color:#eff5e8}
+.live-harmonic-radar-hub span{max-width:90%;font-size:.45rem;line-height:1.1;color:#b8c9bc}
+.live-harmonic-radar[data-has-signal=false] .harmonic-radar-area{fill:rgba(91,220,197,.06);stroke:#668278}
+@media(max-width:620px){.live-harmonic-radar{align-items:flex-start;flex-direction:column}.live-harmonic-radar-wrap{align-self:center;width:148px;height:148px;flex-basis:148px}}
 @media(max-width:620px){.analysis-circle-widget-host{width:118px;min-width:118px;flex-basis:118px}.harmonic-circle-widget .harmonic-wheel-wrap{width:112px}.harmonic-circle-widget .harmonic-wheel-note{font-size:11px}.harmonic-history-heading{align-items:flex-start}.harmonic-history-legend{width:100%;justify-content:flex-start}}

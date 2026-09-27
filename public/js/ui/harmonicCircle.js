@@ -32,6 +32,51 @@ function ringSector(cx, cy, innerRadius, outerRadius, startAngle, endAngle) {
   return `M ${x1} ${y1} A ${outerRadius} ${outerRadius} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${innerRadius} ${innerRadius} 0 0 0 ${x4} ${y4} Z`;
 }
 
+/** Standalone circle-of-fifths radar for microphone input in live karaoke. */
+export function createLiveHarmonicRadar() {
+  const element = makeNode('section', 'live-harmonic-radar');
+  element.setAttribute('aria-label', 'Análisis armónico en vivo: círculo de quintas y radar de croma');
+  element.append(makeNode('h4', '', 'Círculo de quintas · entrada en vivo'));
+  const wrap = makeNode('div', 'live-harmonic-radar-wrap');
+  const svg = makeSvg('svg', { viewBox: '0 0 220 220', role: 'img', 'aria-label': 'Radar de energía cromática en el círculo de quintas' });
+  const radar = makeSvg('g'); const ring = makeSvg('g'); const notes = makeSvg('g');
+  svg.append(radar, ring, notes); wrap.append(svg);
+  const hub = makeNode('div', 'live-harmonic-radar-hub');
+  const chord = makeNode('strong', '', '—');
+  const tones = makeNode('span', '', 'Esperando audio'); hub.append(chord, tones);
+  wrap.append(hub); element.append(wrap);
+  function update(chroma = [], symbol = '') {
+    radar.replaceChildren(); ring.replaceChildren(); notes.replaceChildren();
+    const center = 110, radius = 67;
+    for (const level of [.25, .5, .75, 1]) {
+      const points = FIFTHS.map((pc, index) => polar(center, center, radius * level, -Math.PI / 2 + index * Math.PI / 6).join(',')).join(' ');
+      radar.append(makeSvg('polygon', { points, class: 'harmonic-radar-grid' }));
+    }
+    for (let index = 0; index < 12; index++) {
+      const angle = -Math.PI / 2 + index * Math.PI / 6;
+      const [x, y] = polar(center, center, radius, angle);
+      radar.append(makeSvg('line', { x1: center, y1: center, x2: x, y2: y, class: 'harmonic-radar-axis' }));
+    }
+    const values = FIFTHS.map((pc) => clamp(chroma?.[pc], 0, 1));
+    const points = values.map((value, index) => polar(center, center, Math.max(2, value * radius), -Math.PI / 2 + index * Math.PI / 6).join(',')).join(' ');
+    radar.append(makeSvg('polygon', { points, class: 'harmonic-radar-area live' }));
+    const chordData = getChordTones(symbol);
+    FIFTHS.forEach((pc, index) => {
+      const angle = -Math.PI / 2 + index * Math.PI / 6;
+      const energy = values[index];
+      ring.append(makeSvg('path', { d: ringSector(center, center, 82, 98, angle - Math.PI / 12 + .012, angle + Math.PI / 12 - .012), class: `harmonic-note-sector${chordData.tones.includes(pc) ? ' is-chord-tone' : ''}${pc === chordData.rootPitchClass ? ' is-root' : ''}`, fill: `rgba(75,204,185,${.12 + energy * .8})` }));
+      const [x, y] = polar(center, center, 108, angle);
+      const label = makeSvg('text', { x, y: y + 4, class: `harmonic-wheel-note${chordData.tones.includes(pc) ? ' is-chord-tone' : ''}`, 'text-anchor': 'middle' });
+      label.textContent = NOTES[pc]; ring.append(label);
+    });
+    chord.textContent = symbol || '—';
+    tones.textContent = chordData.recognized ? chordData.tones.map(pitchClassToSharpName).join(' · ') : 'Acorde por determinar';
+    element.dataset.hasSignal = String(values.some((value) => value > 0));
+  }
+  update();
+  return { element, update };
+}
+
 function peakName(peak) {
   return peak.note || `${pitchClassToSharpName(peak.midi % 12)}${Math.floor(peak.midi / 12) - 1}`;
 }

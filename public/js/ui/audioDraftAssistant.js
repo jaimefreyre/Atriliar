@@ -12,6 +12,7 @@ import { scoreChordChroma } from '../music/chromaMatch.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
 import { initialLabSections, sectionAt, splitLabSection, buildLabSong } from '../audio/labComposition.js';
 import { buildWaveformEnvelope } from '../audio/waveformEnvelope.js';
+import { createLiveHarmonicRadar } from './harmonicCircle.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -81,6 +82,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     el('p', { className: 'lab-help' }, 'Divide la pieza donde está el cursor y escribe letra o tablatura sobre el audio. La estructura se puede ajustar después.'),
     sectionList, sectionEditor);
   const livePanel = el('section', { className: 'audio-live-panel', hidden: 'hidden', 'aria-label': 'Karaoke de análisis en vivo' });
+  const liveRadar = createLiveHarmonicRadar();
   const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
   const liveReference = el('strong', { className: 'audio-live-reference' }, 'Referencia: —');
   const liveTransition = el('strong', { className: 'audio-live-transition' }, 'Secuencia: —');
@@ -109,7 +111,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, saveLab, create);
   livePanel.append(el('h3', {}, 'Karaoke de análisis en vivo'),
     el('p', { className: 'audio-live-note' }, 'Inicia el micrófono y reproduce la pista para comparar la entrada con el tramo actual. Usa auriculares para que la pista no se filtre al micrófono. Se analiza localmente; el porcentaje compara perfiles de croma y no es una nota de ejecución. Si cantas una sola nota, puede faltar información para confirmar el acorde completo.'),
-    liveStatus, liveMetrics, liveCompatibility, liveActions);
+    liveStatus, liveMetrics, liveCompatibility, liveRadar.element, liveActions);
   const labHeader = el('header', { className: 'lab-header' });
   const modes = el('nav', { className: 'lab-mode-nav', 'aria-label': 'Vistas del proyecto' });
   modes.append(el('span', { className: 'lab-mode-active', 'aria-current': 'page' }, 'Laboratorio'), editMode, stageMode);
@@ -297,6 +299,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     if (liveScores.length && liveScores.at(-1).frame) {
       const frame = liveScores.at(-1).frame;
       const guess = matchChordTemplate(smoothedLiveChroma.length ? smoothedLiveChroma : frame.chroma, { minScore: 0.5, minMargin: 0.03 });
+      liveRadar.update(smoothedLiveChroma.length ? smoothedLiveChroma : frame.chroma, guess.symbol || '');
       const matches = guess.symbol === referenceSymbol;
       liveGuess.textContent = `Escucha estimada: ${guess.symbol} · ajuste ${guess.score.toFixed(2)}${matches ? ' · coincide con el tramo' : ''}`;
       if (referenceSymbol && segment.chroma) {
@@ -485,6 +488,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
         onHarmony: (frame) => {
           if (liveInputQuality !== 'ok') {
             liveView?.setLiveFrame(null);
+            liveRadar.update([], '');
             liveGuess.textContent = liveInputQuality === 'clipping' ? 'Escucha: señal saturada' : 'Escucha: esperando señal clara';
             liveSimilarity.textContent = 'Afinidad armónica: pausada por nivel de señal';
             return;
@@ -518,6 +522,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     await liveCapture?.stop(); liveCapture = null;
     liveStop.disabled = true; liveStart.disabled = false;
     liveView?.setLiveFrame(null);
+    liveRadar.update([], '');
     liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
     liveTransition.textContent = 'Secuencia: —';
     liveCompatibility.textContent = 'Compatibilidad con el acorde elegido: —';
