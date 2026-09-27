@@ -3,7 +3,7 @@
  * escalas) and tablature panels (C5), all in the one reading/performance
  * view — per direction, this absorbs stageMode.js's (v1) panel features
  * into the v2 view instead of building a second, competing "stage" UI.
- * Fullscreen/Wake Lock are still pending in C9; multi-song setlists remain deferred.
+ * Fullscreen/Wake Lock are available; multi-song setlists remain deferred.
  */
 
 import { getAsset } from '../data/indexedDb.js';
@@ -129,6 +129,25 @@ function renderHarmonyPanel() {
   ]);
   panel.appendChild(scaleRow);
 
+  const studySelect = el('select', { id: 'chord-study-select', 'aria-label': 'Elegir acorde de la canción para estudiar' });
+  studySelect.appendChild(el('option', { value: '' }, ['Seguir acorde del audio']));
+  current.song.chords.forEach((chord, index) => {
+    const seconds = Math.floor(chord.startMs / 1000);
+    const time = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+    studySelect.appendChild(el('option', { value: chord.id }, [`${index + 1}. ${time} · ${chord.symbol}`]));
+  });
+  studySelect.value = current.studyChordId || '';
+  studySelect.onchange = () => { current.studyChordId = studySelect.value || null; renderFrame(); };
+  const jumpButton = el('button', { className: 'btn-tiny', id: 'chord-study-jump', onclick: () => {
+    const event = current.song.chords.find((chord) => chord.id === current.studyChordId);
+    if (event) current.transport.seek(event.startMs);
+  } }, ['Ir a este acorde en la pista']);
+  panel.appendChild(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 14px 10px' }, [
+    el('label', { style: 'color:#a6b1aa;font-size:0.85em' }, ['Acorde para estudiar ', studySelect]),
+    jumpButton,
+    el('span', { id: 'chord-study-status', style: 'color:#cbd2ca;font-size:0.82em', role: 'status', 'aria-live': 'polite' }, ['Siguiendo el acorde del transporte.']),
+  ]));
+
   panel.appendChild(el('div', { id: 'player-fretboard', style: 'padding:0 14px' }));
   panel.appendChild(el('div', { id: 'player-piano', style: 'padding:8px 14px' }));
 
@@ -239,7 +258,8 @@ function renderFrame() {
   });
 
   if (current.harmonyVisible) {
-    const chordEvent = getActiveChord(current.song, snap.positionMs);
+    const selectedChord = current.song.chords.find((event) => event.id === current.studyChordId);
+    const chordEvent = selectedChord || getActiveChord(current.song, snap.positionMs);
     const symbol = chordEvent ? transposeChordSymbol(chordEvent.symbol, current.transposeSemitones) : null;
     const bass = chordEvent && chordEvent.bassNote
       ? transposeChordSymbol(chordEvent.bassNote, current.transposeSemitones)
@@ -249,6 +269,12 @@ function renderFrame() {
     const piano = document.getElementById('player-piano');
     if (fret) renderFretboard(fret, symbol || '', current.layers, bass);
     if (piano) renderPiano(piano, symbol || '', current.layers, bass);
+    const studyStatus = document.getElementById('chord-study-status');
+    if (studyStatus) studyStatus.textContent = selectedChord
+      ? `Estudiando ${selectedChord.symbol} · ${fmtMs(selectedChord.startMs)}–${fmtMs(selectedChord.endMs)}. Usa “Ir a este acorde” para escucharlo.`
+      : (chordEvent ? `Acorde activo: ${chordEvent.symbol}. Elige otro para estudiarlo sin mover la pista.` : 'No hay un acorde activo en este punto.');
+    const jump = document.getElementById('chord-study-jump');
+    if (jump) jump.disabled = !selectedChord;
   }
 
   if (current.tabVisible) {
@@ -301,6 +327,7 @@ export async function openPlayerView(song, onClose) {
     scaleRoot: NOTE_ROOTS.includes(defaultRoot) ? defaultRoot : 'C',
     scaleId: 'none',
     layers: { root: true, chord: true, bass: true, scale: true },
+    studyChordId: null,
     inputListener: createInputActionListener({ onAction: handleInputAction, target: container }),
   };
   container.tabIndex = -1;

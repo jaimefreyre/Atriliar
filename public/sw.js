@@ -1,7 +1,6 @@
-const VERSION = 'v1';
-const SHELL_CACHE = `stageprompter-shell-${VERSION}`;
-const SET_CACHE = `stageprompter-set-assets-${VERSION}`;
-const TOOLS_CACHE = `stageprompter-optional-tools-${VERSION}`;
+const SHELL_CACHE = 'stageprompter-shell-v4';
+const SET_CACHE = 'stageprompter-set-assets-v1';
+const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
   '/', '/css/main.css', '/css/stage.css', '/css/prompter.css', '/css/evaluator.css', '/css/audio-draft.css',
   '/js/app.js', '/js/generated/validateSongV2.js', '/js/data/backup.js', '/js/data/indexedDb.js',
@@ -14,7 +13,7 @@ const SHELL = [
   '/js/timeline/grid.js', '/js/timeline/selectors.js', '/js/transport/audioTrack.js',
   '/js/transport/generatedBacking.js', '/js/transport/manual.js', '/js/transport/transport.js',
   '/js/ui/audioDraftAssistant.js', '/js/ui/calibrationEditor.js', '/js/ui/dom.js', '/js/ui/importDialog.js',
-  '/js/ui/performanceEvaluator.js', '/js/ui/playerView.js', '/js/ui/videoSection.js',
+  '/js/ui/audioAnalysisVisualizer.js', '/js/ui/performanceEvaluator.js', '/js/ui/playerView.js', '/js/ui/videoSection.js',
   '/js/audio/chordTemplateMatch.js', '/js/audio/decodeLocalFile.js', '/js/audio/draftBuilder.js',
   '/js/audio/essentiaAnalysisWorker.js', '/js/audio/micCapture.js', '/js/audio/onsetMatcher.js',
   '/js/audio/onsetWorker.js', '/js/audio/segmentation.js', '/fixtures/songs/all-verses.json',
@@ -27,7 +26,8 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(caches.keys().then((keys) => Promise.all(keys
-    .filter((key) => key.startsWith('stageprompter-') && ![SHELL_CACHE, SET_CACHE, TOOLS_CACHE].includes(key))
+    .filter((key) => key.startsWith('stageprompter-shell-') && key !== SHELL_CACHE
+      || key.startsWith('stageprompter-set-assets-') && key !== SET_CACHE)
     .map((key) => caches.delete(key)))).then(() => self.clients.claim()));
 });
 

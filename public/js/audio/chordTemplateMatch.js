@@ -27,5 +27,6 @@ export function matchChordTemplate(chroma, { minScore = 0.48, minMargin = 0.04 }
   const best = ranked[0];
   const margin = best.score - (ranked[1]?.score || 0);
   return { symbol: best.symbol, score: best.score, margin,
+    alternatives: ranked.slice(0, 6).map(({ symbol, score }) => ({ symbol, score })),
     accepted: best.score >= minScore && margin >= minMargin };
 }

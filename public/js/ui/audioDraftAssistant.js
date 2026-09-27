@@ -4,6 +4,7 @@ import { importSongV2Document } from '../data/importSongV2.js';
 import { getSongV2 } from '../data/indexedDb.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
+import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -31,6 +32,8 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   let decoded = null;
   let analysis = null;
   let worker = null;
+  let mediaUrl = null;
+  let mediaPlayer = null;
   let busy = false;
   const title = el('input', { id: 'audio-draft-title', type: 'text', maxlength: 200, placeholder: 'Título de la canción' });
   const artist = el('input', { id: 'audio-draft-artist', type: 'text', maxlength: 200, placeholder: 'Artista (opcional)' });
@@ -39,6 +42,8 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   const storeAudio = el('input', { id: 'audio-draft-store-audio', type: 'checkbox', checked: 'checked' });
   const status = el('p', { className: 'audio-draft-status', role: 'status', 'aria-live': 'polite' }, 'Elige un archivo. Se analiza en este dispositivo.');
   const preview = el('pre', { className: 'audio-draft-preview' }, 'Sin análisis todavía.');
+  const mediaPreview = el('div', { className: 'audio-study-player' });
+  const analysisPanel = el('div', { id: 'audio-analysis-panel' });
   const analyze = el('button', { type: 'button', className: 'btn-primary' }, 'Analizar archivo');
   const create = el('button', { type: 'button', className: 'btn-primary', disabled: 'true' }, 'Crear borrador y calibrar');
   const closeButton = el('button', { type: 'button', className: 'btn-secondary' }, 'Cerrar');
@@ -53,12 +58,13 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   form.append(fileLabel, titleLabel, artistLabel, bpmLabel, storeLabel);
   const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, create, closeButton);
   dialog.append(heading,
-    el('p', { className: 'audio-draft-note' }, 'El análisis propone tempo y acordes por tríadas. La letra y las secciones quedan sin clasificar; revisa y corrige el resultado en el editor antes de declararlo revisado.'),
-    form, status, preview, actions);
+    el('p', { className: 'audio-draft-note' }, 'El análisis estima tempo y armonía, pero puede equivocarse. Revisa el espectro, compara alternativas, escucha cada tramo y asigna tú el acorde antes de crear el borrador.'),
+    form, mediaPreview, status, preview, analysisPanel, actions);
   document.body.append(dialog);
 
   function cleanUp() {
     worker?.terminate(); worker = null;
+    if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     if (dialog.open) dialog.close();
     dialog.remove(); onClose();
   }
@@ -70,7 +76,13 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   }
   file.addEventListener('change', () => {
     selectedFile = file.files?.[0] || null; decoded = null; analysis = null; create.disabled = true;
+    analysisPanel.replaceChildren(); mediaPreview.replaceChildren(); mediaPlayer = null;
+    if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     if (!selectedFile) return;
+    mediaUrl = URL.createObjectURL(selectedFile);
+    mediaPlayer = document.createElement(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
+    mediaPlayer.controls = true; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
+    mediaPreview.append(mediaPlayer);
     title.value = selectedFile.name.replace(/\.[^.]+$/, '').slice(0, 200);
     preview.textContent = `${selectedFile.name} · ${(selectedFile.size / 1024 / 1024).toFixed(1)} MiB`;
     status.textContent = 'Archivo elegido. Pulsa Analizar archivo para decodificarlo localmente.';
@@ -91,9 +103,24 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
           status.textContent += `\n${data.message}`;
         } else if (data.type === 'analysis') {
           analysis = data;
+          analysis.chordSuggestions = analysis.chordCandidates
+            .filter((segment) => segment.selectedSymbol)
+            .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
+          const analysisView = createAudioAnalysisVisualizer({
+            analysis,
+            onChange: () => {
+              analysis.chordSuggestions = analysis.chordCandidates.filter((segment) => segment.selectedSymbol)
+                .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
+              const unassigned = analysis.chordCandidates.length - analysis.chordSuggestions.length;
+              preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
+            },
+            onSelect: (segment) => { if (mediaPlayer) mediaPlayer.currentTime = segment.startMs / 1000; },
+          });
+          analysisPanel.replaceChildren(analysisView.element);
           bpm.value = Number.isFinite(data.bpm) && data.bpm >= 20 && data.bpm <= 300 ? data.bpm.toFixed(2) : '';
-          preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nOnsets: ${data.onsets.length}\nAcordes sugeridos: ${data.chordSuggestions.length} / ${data.chordCandidates.length} segmentos\nConfianza de ritmo Essentia: ${data.rhythmConfidence.toFixed(3)} (escala no interpretada como porcentaje)`;
-          status.textContent = 'Vista previa lista. Revisa el BPM y crea un borrador estimado para calibrarlo.';
+          const unassigned = data.chordCandidates.length - analysis.chordSuggestions.length;
+          preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados inicialmente: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
+          status.textContent = 'Recorre el mapa, selecciona cada tramo y confirma o corrige el acorde. Al elegir un tramo puedes reproducir desde ese punto.';
           busy = false; analyze.disabled = false; create.disabled = false;
           worker.terminate(); worker = null;
         } else if (data.type === 'error') fail(new Error(data.message));

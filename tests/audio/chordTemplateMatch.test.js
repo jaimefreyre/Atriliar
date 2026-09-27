@@ -8,6 +8,8 @@ test('un croma C-E-G favorece C mayor y expone score/margen', () => {
   assert.equal(result.accepted, true);
   assert.ok(result.score > 0.9);
   assert.ok(result.margin > 0.04);
+  assert.equal(result.alternatives[0].symbol, 'C');
+  assert.equal(result.alternatives.length, 6);
 });
 
 test('un vector vacío no inventa armonía', () => {

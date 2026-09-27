@@ -1,6 +1,12 @@
 import { matchChordTemplate } from './chordTemplateMatch.js';
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 let instance = null;
+
+function describeMidi(midi) {
+  const rounded = Math.round(midi);
+  return { midi: rounded, note: `${NOTE_NAMES[((rounded % 12) + 12) % 12]}${Math.floor(rounded / 12) - 1}` };
+}
 
 async function loadEssentia() {
   if (instance) return instance;
@@ -55,7 +61,14 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
       // Essentia HPCP bins are A..G#; the application contract uses C..B.
       const fromA = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
       const cMajorOrder = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => fromA[index] || 0);
-      chromaFrames.push({ timeSec: startSec, chroma: cMajorOrder });
+      const peakFrequencies = Array.from(essentia.vectorToArray(peaks.frequencies), Number);
+      const peakMagnitudes = Array.from(essentia.vectorToArray(peaks.magnitudes), Number);
+      const spectralPeaks = peakFrequencies.flatMap((frequencyHz, index) => {
+        if (!(frequencyHz > 0) || !Number.isFinite(peakMagnitudes[index])) return [];
+        const midi = 69 + 12 * Math.log2(frequencyHz / 440);
+        return [{ ...describeMidi(midi), frequencyHz, magnitude: peakMagnitudes[index] }];
+      }).sort((a, b) => b.magnitude - a.magnitude).slice(0, 24);
+      chromaFrames.push({ timeSec: startSec, chroma: cMajorOrder, spectralPeaks });
     } finally {
       hpcp?.hpcp?.delete?.(); peaks?.frequencies?.delete?.(); peaks?.magnitudes?.delete?.();
       spectrum?.spectrum?.delete?.(); windowed?.frame?.delete?.(); frame?.delete?.();
@@ -73,9 +86,23 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
     const chroma = Array.from({ length: 12 }, (_, pitch) =>
       frames.reduce((sum, frame) => sum + frame.chroma[pitch], 0) / frames.length);
     const guess = matchChordTemplate(chroma, { minScore: 0.65, minMargin: 0.08 });
+    const maxChroma = Math.max(...chroma, 1e-9);
+    const normalizedChroma = chroma.map((value) => value / maxChroma);
+    const noteEnergy = new Map();
+    for (const frame of frames) for (const peak of frame.spectralPeaks) {
+      const energy = noteEnergy.get(peak.midi) || { ...peak, magnitude: 0 };
+      energy.magnitude += peak.magnitude;
+      noteEnergy.set(peak.midi, energy);
+    }
+    const rankedNotes = [...noteEnergy.values()].sort((a, b) => b.magnitude - a.magnitude);
+    const maxMagnitude = rankedNotes[0]?.magnitude || 1;
+    const pitches = rankedNotes.map((peak) => ({ ...peak, strength: peak.magnitude / maxMagnitude }));
     const candidate = { symbol: guess.symbol, startMs: Math.max(0, Math.round(startSec * 1000)),
       endMs: Math.min(durationMs, Math.round(endSec * 1000)), confidence: guess.score, margin: guess.margin,
-      accepted: guess.accepted };
+      accepted: guess.accepted, selectedSymbol: '',
+      alternatives: guess.alternatives || [], chroma: normalizedChroma,
+      spectralPeaks: pitches.slice(0, 32), bassPeaks: pitches.filter((peak) => peak.midi < 60).slice(0, 8),
+      highPeaks: pitches.filter((peak) => peak.midi >= 60).slice(0, 8) };
     candidates.push(candidate);
     if (guess.accepted) events.push(candidate);
   }
