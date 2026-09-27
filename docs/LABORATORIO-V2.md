@@ -12,8 +12,12 @@ completo sin agregar campos experimentales al documento portable.
    comparten tiempo: pulsar un tramo lo selecciona, reproduce y muestra su estado.
    Pulsar una sección reproduce esa sección completa.
 3. En el inspector se revisan croma, picos espectrales y acordes alternativos, además
-   de posiciones teóricas de guitarra, bajo y piano. La tablatura solo aparece si fue
-   escrita por el usuario; el analizador no inventa digitaciones.
+    de posiciones teóricas de guitarra, bajo y piano. La tablatura solo aparece si fue
+    escrita por el usuario; el analizador no inventa digitaciones.
+   Debajo del diapasón, el círculo de quintas resalta la energía y las notas del acorde.
+   Su espectrograma conserva muestras de picos graves y agudos a lo largo de la pista,
+   y el cursor y los valores destacados siguen el tramo que se escucha. Los proyectos
+   anteriores muestran una constelación temporal resumida con sus picos por pulso.
 4. **Dividir aquí** crea otra sección en el tramo seleccionado. En cada sección se
    puede escribir nombre, tipo, letra y tablatura ASCII.
 5. El laboratorio se guarda localmente con su audio y puede reabrirse desde la

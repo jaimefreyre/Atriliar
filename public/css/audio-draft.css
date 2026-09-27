@@ -170,3 +170,36 @@
 @media(max-width:1200px){.lab-workspace{grid-template-columns:minmax(190px,215px) minmax(0,1fr)}.sound-lab .analysis-studio{grid-template-columns:minmax(185px,.72fr) minmax(270px,1.1fr) minmax(220px,.85fr);gap:.3rem .45rem;padding:.45rem}.lab-sidebar{padding:.6rem}.sound-lab .analysis-studio>.analysis-instruments{grid-column:2;grid-row:3/7}}
 @media(max-width:900px){.lab-workspace{grid-template-columns:1fr}.lab-sidebar{order:2}.sound-lab .analysis-studio{grid-template-columns:minmax(220px,.8fr) minmax(280px,1.2fr);grid-template-rows:auto auto 190px auto minmax(84px,auto) auto auto}.sound-lab .analysis-overview{grid-column:1;grid-row:3}.sound-lab .analysis-segment-heading{grid-column:1;grid-row:4}.sound-lab .analysis-segment-list{grid-column:1;grid-row:5}.analysis-authored-sections{grid-column:1;grid-row:6}.sound-lab .analysis-studio>.analysis-instruments{grid-column:2;grid-row:3/7}.sound-lab .analysis-segment-detail{grid-column:1/-1;grid-row:7;max-height:none;display:grid;grid-template-columns:minmax(180px,.65fr) minmax(220px,.8fr) minmax(230px,1fr);align-items:start;gap:.5rem}.sound-lab .analysis-segment-detail>h4,.sound-lab .analysis-segment-detail>.analysis-chord-card,.sound-lab .analysis-segment-detail>.analysis-chord-controls{grid-column:1}.sound-lab .analysis-segment-detail>.analysis-detail-grid{grid-column:2/4;grid-row:1/4;grid-template-columns:minmax(0,1fr) minmax(160px,.8fr)}.lab-transport{grid-template-columns:minmax(0,1fr) minmax(180px,240px)}}
 @media(max-width:620px){.lab-header{flex-wrap:wrap}.lab-header-brand{order:1}.lab-header>.lab-mode-nav{order:3;width:100%;justify-content:flex-start}.lab-header>button:last-child{margin-left:auto}.lab-transport{grid-template-columns:1fr;grid-template-rows:58px auto auto}.lab-transport .analysis-waveform{grid-column:1;grid-row:1}.lab-transport .audio-study-player{grid-column:1;grid-row:2}.lab-transport-status{grid-column:1;grid-row:3}.sound-lab .analysis-studio{grid-template-columns:1fr;grid-template-rows:auto auto 170px auto auto auto auto}.sound-lab .analysis-overview,.sound-lab .analysis-segment-list,.analysis-authored-sections,.sound-lab .analysis-segment-detail{grid-column:1;grid-row:auto}.sound-lab .analysis-studio>.analysis-instruments{grid-column:1;grid-row:auto;min-height:240px}.sound-lab .analysis-instrument-drawing{max-height:none}.sound-lab .analysis-segment-detail{display:block}.sound-lab .analysis-segment-detail>.analysis-detail-grid{display:grid;grid-template-columns:1fr}.sound-lab .analysis-toolbar{flex-wrap:wrap}.sound-lab .analysis-grid-label{white-space:normal}}
+
+.harmonic-dashboard{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:start;gap:.55rem;margin:.5rem 0 0;padding:.55rem 0 0;border-top:1px solid #35483b}
+.harmonic-circle-column,.harmonic-spectrum-column{min-width:0;padding:.45rem;border:1px solid #33473b;border-radius:8px;background:#08110d}
+.harmonic-circle-column h5,.harmonic-spectrum-column h5{margin:0 0 .35rem;color:#eef3da;font-size:.74rem;line-height:1.25}
+.harmonic-wheel-wrap{position:relative;width:min(100%,260px);aspect-ratio:1;margin:0 auto}
+.harmonic-fifths-svg{display:block;width:100%;height:100%;overflow:visible}
+.harmonic-note-sector{stroke:#20342a;stroke-width:.8}
+.harmonic-wheel-note{fill:#afc2b1;font-size:9px;font-weight:650}
+.harmonic-wheel-note.is-chord-tone{fill:#f0f49c;font-weight:800}
+.harmonic-wheel-note.is-root{fill:#fff;font-size:10px}
+.harmonic-spectrum-point{stroke:#08110d;stroke-width:1.4;fill:#53d9c5}
+.harmonic-spectrum-point.bass{fill:#efa955}
+.harmonic-spectrum-point:focus{stroke:#fff;stroke-width:2.5;outline:none}
+.harmonic-chord-hub{position:absolute;top:50%;left:50%;display:flex;width:38%;min-width:86px;max-width:112px;aspect-ratio:1;flex-direction:column;align-items:center;justify-content:center;gap:.12rem;padding:.35rem;border:1px solid #62744d;border-radius:50%;background:radial-gradient(circle,#17231a 0,#0a110d 72%);text-align:center;transform:translate(-50%,-50%);pointer-events:none}
+.harmonic-chord-name{color:#f1f37b;font-size:1.1rem;line-height:1}
+.harmonic-chord-quality{color:#c8d7c7;font-size:.55rem}
+.harmonic-chord-notes{display:flex;justify-content:center;gap:.12rem;flex-wrap:wrap}
+.harmonic-note-chip{display:inline-grid;min-width:18px;height:18px;place-items:center;padding:0 .18rem;border-radius:9px;background:#344528;color:#f4f5d6;font-size:.57rem;font-weight:750}
+.harmonic-note-chip.is-root{background:#e5ef70;color:#152014}
+.harmonic-note-chip.is-estimate{background:#275a50}
+.harmonic-note-chip.is-empty{font-weight:500}
+.harmonic-wheel-legend{display:flex;justify-content:center;gap:.4rem;flex-wrap:wrap;margin-top:.2rem;color:#aebfb1;font-size:.57rem}
+.harmonic-wheel-legend span:first-child{color:#efb15f}.harmonic-wheel-legend span:nth-child(2){color:#6fddcd}
+.harmonic-spectrum-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.35rem}
+.harmonic-spectrum-time{color:#ffad70;font:600 .66rem ui-monospace,Consolas,monospace}
+.harmonic-spectrogram{display:block;width:100%;height:172px;border:1px solid #2a3c31;border-radius:5px;background:#08110d}
+.harmonic-peak-readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.18rem;margin-top:.25rem}
+.harmonic-peak-chip{overflow:hidden;padding:.18rem .25rem;border-left:2px solid #58d8c3;background:#111c16;color:#dbe8dd;font: .58rem ui-monospace,Consolas,monospace;text-overflow:ellipsis;white-space:nowrap}
+.harmonic-peak-chip.bass{border-left-color:#efa955}
+.harmonic-constellation-readout{display:flex;gap:.2rem;flex-wrap:wrap;margin-top:.25rem}
+.harmonic-register-chip{padding:.2rem .3rem;border-radius:5px;background:#19251e;color:#d8e6da;font-size:.59rem}
+.harmonic-register-chip.bass{color:#f0bb74}.harmonic-register-chip.high{color:#78dfd0}
+@media(max-width:360px){.harmonic-dashboard{grid-template-columns:1fr}.harmonic-wheel-wrap{width:min(100%,290px)}.harmonic-spectrum-column{order:2}}

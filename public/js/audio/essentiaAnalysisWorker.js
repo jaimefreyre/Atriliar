@@ -77,6 +77,15 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
 
   const events = [];
   const candidates = [];
+  // Keep a compact ~4.6 Hz spectral trace so the UI can draw a full-song
+  // spectrogram and follow the playhead without retaining every FFT frame.
+  const spectralFrames = chromaFrames.filter((_, frameIndex) => frameIndex % 5 === 0).map((frame) => {
+    const maximum = frame.spectralPeaks[0]?.magnitude || 1;
+    return { timeMs: Math.round(frame.timeSec * 1000), peaks: frame.spectralPeaks.slice(0, 12).map((peak) => ({
+      midi: peak.midi, note: peak.note, frequencyHz: Math.round(peak.frequencyHz),
+      strength: Math.round(peak.magnitude / maximum * 1000) / 1000,
+    })) };
+  });
   for (let index = 0; index + 1 < beatSeconds.length; index++) {
     const startSec = beatSeconds[index];
     const endSec = beatSeconds[index + 1];
@@ -106,7 +115,7 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
     candidates.push(candidate);
     if (guess.accepted) events.push(candidate);
   }
-  return { events, candidates };
+  return { events, candidates, spectralFrames };
 }
 
 self.onmessage = async ({ data }) => {
@@ -134,15 +143,15 @@ self.onmessage = async ({ data }) => {
       } catch (error) {
         self.postMessage({ type: 'warning', message: `OnsetRate no disponible: ${error.message}` });
       }
-      let chordSuggestions = [], chordCandidates = [];
+      let chordSuggestions = [], chordCandidates = [], spectralFrames = [];
       try {
-        ({ events: chordSuggestions, candidates: chordCandidates } = estimateChordEvents(essentia, pcm44100, beats,
+        ({ events: chordSuggestions, candidates: chordCandidates, spectralFrames } = estimateChordEvents(essentia, pcm44100, beats,
           Math.round(pcm44100.length / 44100 * 1000), Number(rhythm.bpm)));
       }
       catch (error) { self.postMessage({ type: 'warning', message: `Análisis de acordes no disponible: ${error.message}` }); }
       self.postMessage({ type: 'analysis', version: essentia.version, sampleRate: 44100,
         durationMs: Math.round(pcm44100.length / 44100 * 1000), bpm: Number(rhythm.bpm),
-        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates });
+        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates, spectralFrames });
       rhythm.ticks?.delete?.(); rhythm.bpmIntervals?.delete?.(); rhythm.estimates?.delete?.();
     } finally {
       signal?.delete?.();

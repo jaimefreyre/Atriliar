@@ -3,6 +3,7 @@ import { renderFretboard, renderPiano, setActiveScale } from '../rendering/chord
 import { renderBassFretboard } from '../rendering/bassFretboard.js';
 import { renderAsciiTab } from '../rendering/tabRenderer.js';
 import { SCALES } from '../music/scales.js';
+import { createHarmonicCircle } from './harmonicCircle.js';
 
 const PITCH_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const QUALITIES = ['', 'm', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim', 'aug'];
@@ -74,6 +75,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   let selectedIndex = 0;
   let activeChordSelect = null;
+  let harmonicVisualization = null;
   let playbackPositionMs = 0;
   let auditionStatus = '';
   let liveFrame = null;
@@ -223,10 +225,11 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       const chosen = segment.selectedSymbol ? `✓ ${segment.selectedSymbol}` : (segment.symbol ? `¿${segment.symbol}?` : 'Sin acorde');
       const item = node('button', 'analysis-segment', `${index + 1} · ${timeLabel(segment.startMs)}–${timeLabel(segment.endMs)} · ${chosen}`);
       item.type = 'button'; item.setAttribute('aria-current', index === selectedIndex ? 'true' : 'false');
-      item.addEventListener('click', () => { selectedIndex = index; renderDetail(); onSelect(segment); });
+      item.addEventListener('click', () => { selectedIndex = index; playbackPositionMs = segment.startMs; renderDetail(); onSelect(segment); });
       list.append(item);
     });
     const segment = segments[selectedIndex];
+    harmonicVisualization?.dispose(); harmonicVisualization = null;
     drawOverview();
     if (!segment) { detail.append(node('p', '', 'No se obtuvieron tramos para visualizar.')); return; }
 
@@ -333,7 +336,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       button.addEventListener('click', () => { activeInstrument = id; renderDetail(); });
       instrumentNav.append(button);
     });
-    instrumentPanel.append(instrumentNav, drawing);
+    harmonicVisualization = createHarmonicCircle({ analysis, segment, playbackPositionMs });
+    instrumentPanel.append(instrumentNav, drawing, harmonicVisualization.element);
     renderInstrument();
   }
 
@@ -343,7 +347,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     const rect = target.getBoundingClientRect();
     const timeMs = Math.max(0, Math.min(analysis.durationMs - 1, ((event.clientX - rect.left - 48) / (rect.width - 60)) * analysis.durationMs));
     const index = analysis.chordCandidates.findIndex((segment) => timeMs >= segment.startMs && timeMs < segment.endMs);
-    if (index >= 0) { selectedIndex = index; renderDetail(); onSelect(analysis.chordCandidates[index]); }
+    if (index >= 0) { selectedIndex = index; playbackPositionMs = analysis.chordCandidates[index].startMs; renderDetail(); onSelect(analysis.chordCandidates[index]); }
   }
   canvas.addEventListener('click', (event) => selectAtCanvas(event, canvas));
   waveformCanvas.addEventListener('click', (event) => selectAtCanvas(event, waveformCanvas));
@@ -355,13 +359,21 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     playbackPositionMs = Number.isFinite(positionMs) ? positionMs : 0;
     const index = analysis.chordCandidates.findIndex((segment) => playbackPositionMs >= segment.startMs && playbackPositionMs < segment.endMs);
     if (followSelection && index >= 0 && index !== selectedIndex) { selectedIndex = index; renderDetail(); }
-    else drawOverview();
+    else {
+      harmonicVisualization?.update(analysis.chordCandidates[index] || analysis.chordCandidates[selectedIndex], playbackPositionMs, liveFrame);
+      drawOverview();
+    }
   }
 
-  function setLiveFrame(frame) { liveFrame = frame; drawOverview(); }
+  function setLiveFrame(frame) {
+    liveFrame = frame;
+    const index = analysis.chordCandidates.findIndex((segment) => playbackPositionMs >= segment.startMs && playbackPositionMs < segment.endMs);
+    harmonicVisualization?.update(analysis.chordCandidates[index] || analysis.chordCandidates[selectedIndex], playbackPositionMs, liveFrame);
+    drawOverview();
+  }
   function selectSegmentAt(positionMs) {
     const index = analysis.chordCandidates.findIndex((segment) => positionMs >= segment.startMs && positionMs < segment.endMs);
-    if (index >= 0) { selectedIndex = index; renderDetail(); }
+    if (index >= 0) { selectedIndex = index; playbackPositionMs = analysis.chordCandidates[index].startMs; renderDetail(); }
   }
   function setAuditionStatus(message) {
     auditionStatus = message;
