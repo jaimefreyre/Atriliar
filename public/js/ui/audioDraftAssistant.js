@@ -113,10 +113,14 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   const labHeader = el('header', { className: 'lab-header' });
   const modes = el('nav', { className: 'lab-mode-nav', 'aria-label': 'Vistas del proyecto' });
   modes.append(el('span', { className: 'lab-mode-active', 'aria-current': 'page' }, 'Laboratorio'), editMode, stageMode);
-  labHeader.append(el('div', {}, ''), modes, closeButton);
-  labHeader.firstChild.append(heading, el('p', { className: 'audio-draft-note' }, 'Escucha, analiza y escribe sobre una misma pieza. Las notas y acordes detectados son hipótesis hasta que los revises.'));
+  const headerBrand = el('div', { className: 'lab-header-brand' }); headerBrand.append(heading);
+  const headerHelp = el('button', { type: 'button', className: 'analysis-help-tip lab-header-help' }, '?');
+  headerHelp.dataset.tip = 'Selecciona un tramo del mapa para escuchar y estudiar cómo cambia la armonía. El acorde aproximado se puede corregir; las posiciones muestran notas posibles para tocar.';
+  headerHelp.setAttribute('aria-label', headerHelp.dataset.tip);
+  headerBrand.append(headerHelp);
+  labHeader.append(headerBrand, modes, headerHelp, closeButton);
   const transport = el('section', { className: 'lab-transport', 'aria-label': 'Reproducción de la pista' });
-  transport.append(el('strong', {}, 'Pista original'), mediaPreview, transportStatus);
+  transport.append(mediaPreview, transportStatus);
   const sidebar = el('aside', { className: 'lab-sidebar' });
   sidebar.append(el('h2', {}, 'Fuente y proyecto'), form, status, preview, actions, sectionPanel);
   const workspace = el('div', { className: 'lab-workspace' }); workspace.append(sidebar, analysisPanel);
@@ -384,7 +388,14 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       onSelect: playAnalysisSegment,
       getSection: (positionMs) => sectionAt(labSections, positionMs),
     });
-    liveView?.dispose(); analysisPanel.replaceChildren(analysisView.element);
+    liveView?.dispose();
+    transport.querySelector('.analysis-waveform')?.remove();
+    analysisPanel.replaceChildren(analysisView.element);
+    transport.insertBefore(analysisView.waveformCanvas, mediaPreview);
+    const sectionMap = el('section', { className: 'analysis-authored-sections', 'aria-label': 'Secciones de la canción' });
+    sectionMap.append(el('h4', {}, 'Secciones'), sectionList);
+    analysisView.element.insertBefore(sectionMap, analysisView.element.querySelector('.analysis-instruments'));
+    requestAnimationFrame(() => analysisView.redraw());
     liveView = analysisView;
     livePanel.hidden = false;
     livePlayerEvents(true);

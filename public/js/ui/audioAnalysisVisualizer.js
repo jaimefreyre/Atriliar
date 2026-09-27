@@ -27,15 +27,19 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const root = node('section', 'analysis-studio');
   root.setAttribute('aria-labelledby', 'analysis-studio-title');
   const heading = node('h3', '', 'Mapa de análisis de la canción'); heading.id = 'analysis-studio-title';
-  root.append(heading);
-  root.append(node('p', 'analysis-explainer', 'La altura de los armónicos puede crear varias lecturas posibles. El color muestra energía relativa de croma; los puntos muestran picos del espectro agrupados por nota. Un pico puede ser un armónico y no la fundamental. Las propuestas no son probabilidades ni acordes confirmados.'));
+  const titleRow = node('div', 'analysis-title-row');
+  titleRow.append(heading);
+  const guide = node('button', 'analysis-help-tip', '?');
+  guide.type = 'button'; guide.dataset.tip = 'El mapa muestra energía de notas y picos armónicos. Un pico puede ser un armónico de otra nota; las sugerencias son aproximaciones que puedes corregir.';
+  guide.setAttribute('aria-label', guide.dataset.tip);
+  titleRow.append(guide); root.append(titleRow);
 
   const modeLabel = node('label', 'analysis-mode-label', 'Vista global ');
   const mode = node('select', 'analysis-mode');
   [['chroma', 'Mapa de croma / armonía'], ['bass', 'Constelación de bajos'], ['melody', 'Constelación de registro alto']]
     .forEach(([value, label]) => { const option = node('option', '', label); option.value = value; mode.append(option); });
   modeLabel.append(mode);
-  root.append(modeLabel);
+  const toolbar = node('div', 'analysis-toolbar'); toolbar.append(modeLabel);
 
   const groupingLabel = node('label', 'analysis-grid-label', 'Agrupar pulsos por compás ');
   const grouping = node('select', 'analysis-grid-grouping');
@@ -43,8 +47,10 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     const option = node('option', '', `${count} pulsos`); option.value = String(count); grouping.append(option);
   }
   grouping.value = '4';
-  groupingLabel.append(grouping); root.append(groupingLabel);
-  root.append(node('p', 'analysis-grid-note', 'Las líneas finas son pulsos detectados; las gruesas marcan el inicio de cada compás según la agrupación elegida. Ajusta esa agrupación si el pulso estimado no coincide con el compás musical.'));
+  groupingLabel.append(grouping); toolbar.append(groupingLabel);
+  const rhythmGuide = node('button', 'analysis-help-tip', '?');
+  rhythmGuide.type = 'button'; rhythmGuide.dataset.tip = 'Las líneas finas marcan pulsos; las gruesas indican compases según el agrupamiento elegido. Cámbialo si no coincide con la métrica de la canción.';
+  rhythmGuide.setAttribute('aria-label', rhythmGuide.dataset.tip); toolbar.append(rhythmGuide); root.append(toolbar);
 
   const waveformCanvas = node('canvas', 'analysis-waveform');
   waveformCanvas.setAttribute('aria-label', 'Forma de onda de toda la pista. Selecciona un punto para escuchar el pasaje.');
@@ -52,7 +58,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const canvas = node('canvas', 'analysis-overview');
   canvas.setAttribute('aria-label', 'Vista completa del análisis. También puedes elegir cada tramo en la lista inferior.');
   root.append(canvas);
-  const listHeading = node('h4', '', 'Tramos de toda la canción · selecciona uno para estudiarlo');
+  const listHeading = node('h4', 'analysis-segment-heading', 'Tramos del análisis');
   root.append(listHeading);
   const list = node('div', 'analysis-segment-list');
   list.setAttribute('role', 'group');
@@ -62,46 +68,50 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const detail = node('section', 'analysis-segment-detail');
   detail.setAttribute('aria-live', 'polite');
   root.append(detail);
+  const instrumentPanel = node('section', 'analysis-instruments');
+  instrumentPanel.setAttribute('aria-label', 'Instrumento para estudiar el tramo actual');
+  root.append(instrumentPanel);
 
   let selectedIndex = 0;
   let activeChordSelect = null;
   let playbackPositionMs = 0;
-  let auditionStatus = 'Haz clic en un tramo del mapa o de la lista para escucharlo.';
+  let auditionStatus = '';
   let liveFrame = null;
   let scaleId = 'none';
+  let activeInstrument = 'guitar';
 
   function drawWaveform() {
     const rect = waveformCanvas.getBoundingClientRect();
     if (!rect.width) return;
     const ratio = window.devicePixelRatio || 1;
     const width = Math.max(320, Math.floor(rect.width));
-    const height = 94;
+    const height = 58;
     waveformCanvas.width = Math.floor(width * ratio); waveformCanvas.height = Math.floor(height * ratio);
     const ctx = waveformCanvas.getContext('2d');
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#0b1612'; ctx.fillRect(0, 0, width, height);
     const left = 48; const plotWidth = width - 60; const samples = analysis.waveform || [];
-    ctx.strokeStyle = '#273b31'; ctx.beginPath(); ctx.moveTo(left, 46); ctx.lineTo(width - 12, 46); ctx.stroke();
+    ctx.strokeStyle = '#273b31'; ctx.beginPath(); ctx.moveTo(left, 29); ctx.lineTo(width - 12, 29); ctx.stroke();
     if (samples.length) {
       ctx.fillStyle = '#69c7ab';
       for (let x = 0; x < plotWidth; x += 2) {
         const index = Math.min(samples.length - 1, Math.floor(x / plotWidth * samples.length));
         const amplitude = Math.max(1, (samples[index] || 0) * 34);
-        ctx.fillRect(left + x, 46 - amplitude, 1.5, amplitude * 2);
+        ctx.fillRect(left + x, 29 - amplitude, 1.5, amplitude * 2);
       }
     } else {
       ctx.fillStyle = '#a3b7a8'; ctx.font = '12px sans-serif';
-      ctx.fillText('Forma de onda no disponible en este análisis; vuelve a analizar el audio para añadirla.', left + 8, 51);
+      ctx.fillText('Forma de onda no disponible; vuelve a analizar el audio para añadirla.', left + 8, 33);
     }
     const segment = analysis.chordCandidates[selectedIndex];
     if (segment) {
       const x = left + segment.startMs / analysis.durationMs * plotWidth;
       const w = Math.max(2, (segment.endMs - segment.startMs) / analysis.durationMs * plotWidth);
-      ctx.strokeStyle = '#f2f66f'; ctx.lineWidth = 2; ctx.strokeRect(x, 10, w, 72);
+      ctx.strokeStyle = '#f2f66f'; ctx.lineWidth = 2; ctx.strokeRect(x, 5, w, 48);
     }
     const cursor = left + Math.max(0, Math.min(analysis.durationMs, playbackPositionMs)) / Math.max(1, analysis.durationMs) * plotWidth;
-    ctx.strokeStyle = '#ffad65'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cursor, 8); ctx.lineTo(cursor, 84); ctx.stroke();
-    ctx.fillStyle = '#c9d7cd'; ctx.font = '11px sans-serif'; ctx.fillText('Audio', 8, 49);
+    ctx.strokeStyle = '#ffad65'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cursor, 4); ctx.lineTo(cursor, 54); ctx.stroke();
+    ctx.fillStyle = '#c9d7cd'; ctx.font = '11px sans-serif'; ctx.fillText('Audio', 8, 33);
   }
 
   function drawOverview() {
@@ -220,12 +230,22 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     drawOverview();
     if (!segment) { detail.append(node('p', '', 'No se obtuvieron tramos para visualizar.')); return; }
 
-    const time = `${timeLabel(segment.startMs)}–${timeLabel(segment.endMs)} (${((segment.endMs - segment.startMs) / 1000).toFixed(2)} s)`;
-    detail.append(node('h4', '', `Tramo ${selectedIndex + 1} · ${time}`));
-    const suggestion = segment.symbol
-      ? `Sugerencia automática: ${segment.symbol} · ajuste ${segment.confidence.toFixed(3)} · margen ${segment.margin.toFixed(3)} (métricas internas, no porcentajes).`
-      : 'Sin propuesta automática clara para este tramo.';
-    detail.append(node('p', 'analysis-suggestion', suggestion));
+    const symbol = segment.selectedSymbol || segment.symbol || '';
+    detail.append(node('h4', '', `Tramo ${selectedIndex + 1} · ${timeLabel(segment.startMs)}–${timeLabel(segment.endMs)}`));
+    const confidence = Math.max(0, Math.min(1, Number(segment.confidence) || 0));
+    const confidenceTier = confidence >= 0.72 ? 'high' : confidence >= 0.5 ? 'medium' : 'low';
+    const chordCard = node('div', `analysis-chord-card ${segment.selectedSymbol ? 'is-defined' : `is-${confidenceTier}`}`);
+    chordCard.append(node('div', 'analysis-chord-card-heading', segment.selectedSymbol
+      ? `Acorde definido · ${segment.selectedSymbol}`
+      : symbol ? `Acorde aproximado · ${segment.symbol}` : 'Acorde aproximado · sin propuesta clara'));
+    const meterLabel = node('div', 'analysis-confidence-label', segment.selectedSymbol
+      ? 'Confirmado manualmente' : `Coincidencia orientativa · ${Math.round(confidence * 100)}%`);
+    const meter = node('div', 'analysis-confidence-track');
+    meter.setAttribute('role', 'img');
+    meter.setAttribute('aria-label', segment.selectedSymbol ? 'Acorde definido manualmente' : `Ajuste orientativo ${Math.round(confidence * 100)} por ciento`);
+    const meterFill = node('span', 'analysis-confidence-fill');
+    meterFill.style.width = `${segment.selectedSymbol ? 100 : confidence * 100}%`;
+    meter.append(meterFill); chordCard.append(meterLabel, meter); detail.append(chordCard);
     const controls = node('div', 'analysis-chord-controls');
     const listen = node('button', 'analysis-listen-button', '▶ Escuchar tramo seleccionado');
     listen.type = 'button';
@@ -259,37 +279,35 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     detail.append(controls);
 
     const graph = node('div', 'analysis-detail-grid');
-    const chromaPanel = node('div', 'analysis-detail-card');
-    chromaPanel.append(node('strong', '', 'Energía por nota (HPCP/croma)'));
-    (segment.chroma || Array(12).fill(0)).forEach((energy, pitch) => {
-      const row = node('div', 'analysis-chroma-row');
-      row.append(node('span', '', PITCH_NAMES[pitch]));
-      const track = node('span', 'analysis-chroma-track');
-      const fill = node('span', 'analysis-chroma-fill'); fill.style.width = `${Math.max(0, Math.min(100, energy * 100))}%`;
-      track.append(fill); row.append(track);
-      row.append(node('span', 'analysis-energy-value', `${Math.round(energy * 100)}%`));
-      chromaPanel.append(row);
-    });
     const spectralPanel = node('div', 'analysis-detail-card');
     spectralPanel.append(node('strong', '', 'Picos espectrales dominantes · nota/octava estimada'));
     const peaks = segment.spectralPeaks || [];
     if (!peaks.length) spectralPanel.append(node('p', 'analysis-empty', 'No hay picos suficientes en este tramo.'));
-    peaks.slice(0, 12).forEach((peak) => {
+    peaks.slice(0, 6).forEach((peak) => {
       const row = node('div', 'analysis-spectrum-row');
       row.append(node('span', '', `${peak.note} · ${peak.frequencyHz.toFixed(0)} Hz`));
       const track = node('span', 'analysis-chroma-track');
       const fill = node('span', 'analysis-spectrum-fill'); fill.style.width = `${Math.max(2, Math.min(100, (peak.strength || 0) * 100))}%`;
       track.append(fill); row.append(track); spectralPanel.append(row);
     });
-    graph.append(chromaPanel, spectralPanel); detail.append(graph);
+    const chromaPanel = node('details', 'analysis-detail-card analysis-chroma-details');
+    chromaPanel.append(node('summary', '', 'Energía por nota · HPCP/croma'));
+    (segment.chroma || Array(12).fill(0)).forEach((energy, pitch) => {
+      const row = node('div', 'analysis-chroma-row');
+      row.append(node('span', '', PITCH_NAMES[pitch]));
+      const track = node('span', 'analysis-chroma-track');
+      const fill = node('span', 'analysis-chroma-fill'); fill.style.width = `${Math.max(0, Math.min(100, energy * 100))}%`;
+      track.append(fill); row.append(track, node('span', 'analysis-energy-value', `${Math.round(energy * 100)}%`));
+      chromaPanel.append(row);
+    });
+    graph.append(spectralPanel, chromaPanel); detail.append(graph);
 
-    const symbol = segment.selectedSymbol || segment.symbol || '';
     const section = getSection(segment.startMs);
-    const instrumentPanel = node('section', 'analysis-instruments');
+    instrumentPanel.replaceChildren();
     instrumentPanel.append(node('h4', '', 'Posiciones para tocar'));
     instrumentPanel.append(node('p', 'analysis-instrument-note', symbol
-      ? `${symbol} · ${segment.selectedSymbol ? 'acorde elegido' : 'hipótesis automática'}. Las posiciones muestran notas posibles, no el instrumento ni la digitación que suena en la grabación.`
-      : 'Sin acorde elegido: selecciona una propuesta o escribe el acorde para ver posiciones posibles.'));
+      ? `Acorde actual: ${symbol} · posiciones teóricas`
+      : 'Elige un acorde para ver sus posiciones posibles en el instrumento.'));
     const scaleLabel = node('label', 'analysis-scale-control', 'Escala para explorar ');
     const scaleSelect = node('select', 'analysis-scale-select');
     scaleSelect.add(new Option('— Ninguna —', 'none'));
@@ -299,21 +317,24 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     scaleLabel.append(scaleSelect); instrumentPanel.append(scaleLabel);
     const chordNotes = getChordTones(symbol);
     setActiveScale(chordNotes.root || 'C', scaleId);
-    const addInstrument = (title, render) => {
-      const block = node('details', 'analysis-instrument'); block.open = true;
-      block.append(node('summary', '', title));
-      const drawing = node('div', 'analysis-instrument-drawing'); render(drawing); block.append(drawing);
-      instrumentPanel.append(block);
+    const instrumentNav = node('div', 'analysis-instrument-switch');
+    const drawing = node('div', 'analysis-instrument-drawing analysis-active-instrument');
+    const renderInstrument = () => {
+      drawing.replaceChildren();
+      if (activeInstrument === 'guitar') renderFretboard(drawing, symbol);
+      else if (activeInstrument === 'bass') renderBassFretboard(drawing, symbol);
+      else if (activeInstrument === 'piano') renderPiano(drawing, symbol);
+      else if (section?.tab?.trim()) renderAsciiTab(drawing, { label: section.label, ascii: section.tab });
+      else drawing.append(node('p', 'analysis-empty', 'Esta sección todavía no tiene tablatura. Puedes escribirla en el editor de sección.'));
     };
-    addInstrument('Guitarra · diapasón', (container) => renderFretboard(container, symbol));
-    addInstrument('Bajo · posiciones E A D G', (container) => renderBassFretboard(container, symbol));
-    addInstrument('Piano · notas del acorde y escala', (container) => renderPiano(container, symbol));
-    const tabBlock = node('details', 'analysis-instrument'); tabBlock.open = Boolean(section?.tab);
-    tabBlock.append(node('summary', '', 'Tablatura escrita para esta sección'));
-    const tabContent = node('div', 'analysis-instrument-drawing');
-    renderAsciiTab(tabContent, section?.tab?.trim() ? { label: section.label, ascii: section.tab } : null);
-    tabBlock.append(tabContent); instrumentPanel.append(tabBlock);
-    detail.append(instrumentPanel);
+    [['guitar', 'Guitarra'], ['bass', 'Bajo'], ['piano', 'Piano'], ['tab', 'Tab']].forEach(([id, label]) => {
+      const button = node('button', 'analysis-instrument-tab', label); button.type = 'button';
+      button.setAttribute('aria-pressed', String(activeInstrument === id));
+      button.addEventListener('click', () => { activeInstrument = id; renderDetail(); });
+      instrumentNav.append(button);
+    });
+    instrumentPanel.append(instrumentNav, drawing);
+    renderInstrument();
   }
 
   mode.addEventListener('change', drawOverview);
@@ -348,7 +369,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     if (status) status.textContent = message;
   }
 
-  return { element: root, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
+  return { element: root, waveformCanvas, redraw: drawOverview, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
     setPlaybackPosition, setLiveFrame, setAuditionStatus, selectSegmentAt, refreshDetail: renderDetail,
     dispose: () => resizeObserver?.disconnect(),
     getSelectedSegment: () => analysis.chordCandidates[selectedIndex] || null };

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v10-lab';
+const SHELL_CACHE = 'stageprompter-shell-v12-lab-layout';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
