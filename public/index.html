@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StagePrompter Pro</title>
+  <title>Laboratorio del sonido | StagePrompter</title>
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/stage.css">
   <link rel="stylesheet" href="css/prompter.css">
@@ -13,18 +13,21 @@
 <body>
   <div id="app">
     <header>
-      <h1>🎸 STAGE PROMPTER <span class="version">PRO</span></h1>
+      <h1>🎧 LABORATORIO DEL SONIDO <span class="version">V2</span></h1>
     </header>
     <main id="library-view">
+      <p class="lab-library-intro">Carga una pieza, explora el mapa armónico, escucha cada pasaje y escribe la canción sobre la pista. Tus análisis quedan disponibles para volver a estudiarlos.</p>
       <div class="actions">
         <button id="btn-import" class="btn-primary">📥 IMPORTAR</button>
-        <button id="btn-audio-draft" class="btn-secondary">🎧 BORRADOR DESDE AUDIO</button>
-        <button id="btn-new" class="btn-secondary">➕ NUEVA</button>
+        <button id="btn-audio-draft" class="btn-primary">🎧 NUEVO LABORATORIO</button>
+        <button id="btn-new" class="btn-secondary">➕ CANCIÓN SIN AUDIO</button>
         <button id="btn-export-backup" class="btn-secondary">⬇ RESPALDO JSON</button>
         <input type="file" id="file-input" accept=".json" style="display:none">
       </div>
       <p id="storage-status" role="status" aria-live="polite" class="storage-status">Preparando almacenamiento sin conexión…</p>
-      <h2> MIS CANCIONES</h2>
+      <h2>Laboratorios de audio</h2>
+      <div id="lab-project-list" class="song-list"></div>
+      <h2>Mis canciones</h2>
       <div id="song-list" class="song-list"></div>
     </main>
   </div>

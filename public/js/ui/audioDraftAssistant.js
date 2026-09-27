@@ -1,8 +1,8 @@
 import { decodeLocalFile } from '../audio/decodeLocalFile.js';
-import { buildAudioDraft } from '../audio/draftBuilder.js';
 import { importSongV2Document } from '../data/importSongV2.js';
-import { getSongV2 } from '../data/indexedDb.js';
+import { getSongV2, getLabProject, getAsset, saveLabProject, saveLabProjectWithAsset } from '../data/indexedDb.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
+import { openPlayerView } from './playerView.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
 import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
 import { createMicCapture } from '../audio/micCapture.js';
@@ -10,6 +10,8 @@ import { matchChordTemplate } from '../audio/chordTemplateMatch.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
 import { scoreChordChroma } from '../music/chromaMatch.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
+import { initialLabSections, sectionAt, splitLabSection, buildLabSong } from '../audio/labComposition.js';
+import { buildWaveformEnvelope } from '../audio/waveformEnvelope.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -30,11 +32,12 @@ function createAssetId() {
 }
 
 /** Local-only optional assistant. All audio analysis happens in its module Worker. */
-export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
+export async function openAudioDraftAssistant({ projectId: existingProjectId = null, songId = null, onClose = () => {} } = {}) {
   if (document.getElementById('audio-draft-assistant')) return;
   cacheOptionalAudioTools().catch(() => {});
   let selectedFile = null;
   let decoded = null;
+  let waveform = [];
   let analysis = null;
   let worker = null;
   let mediaUrl = null;
@@ -50,16 +53,33 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   let playheadFrame = null;
   let playheadMediaPlayer = null;
   let auditionEndMs = null;
+  let auditionArmed = false;
+  let auditionToken = 0;
+  let labSections = [];
+  let projectId = existingProjectId;
+  let projectAudioAssetId = null;
+  let pendingAsset = null;
+  let saveTimer = null;
+  let saveQueue = Promise.resolve();
+  let selectedSectionId = null;
+  let linkedSongId = null;
   let busy = false;
   const title = el('input', { id: 'audio-draft-title', type: 'text', maxlength: 200, placeholder: 'Título de la canción' });
   const artist = el('input', { id: 'audio-draft-artist', type: 'text', maxlength: 200, placeholder: 'Artista (opcional)' });
   const bpm = el('input', { id: 'audio-draft-bpm', type: 'number', min: 20, max: 300, step: '0.01', placeholder: 'BPM estimado' });
   const file = el('input', { id: 'audio-draft-file', type: 'file', accept: 'audio/*,video/*' });
-  const storeAudio = el('input', { id: 'audio-draft-store-audio', type: 'checkbox', checked: 'checked' });
   const status = el('p', { className: 'audio-draft-status', role: 'status', 'aria-live': 'polite' }, 'Elige un archivo. Se analiza en este dispositivo.');
   const preview = el('pre', { className: 'audio-draft-preview' }, 'Sin análisis todavía.');
   const mediaPreview = el('div', { className: 'audio-study-player' });
+  const transportStatus = el('span', { className: 'lab-transport-status', role: 'status', 'aria-live': 'polite' }, 'Carga una pista para escuchar el análisis.');
   const analysisPanel = el('div', { id: 'audio-analysis-panel' });
+  analysisPanel.append(el('div', { className: 'lab-empty-map' }, 'Carga una pista y pulsa «Analizar archivo» para construir el mapa del sonido.'));
+  const sectionList = el('nav', { className: 'lab-section-list', 'aria-label': 'Secciones de la pieza' });
+  const sectionEditor = el('div', { className: 'lab-section-editor' });
+  const sectionPanel = el('section', { className: 'lab-section-panel' });
+  sectionPanel.append(el('h3', {}, 'Estructura y escritura'),
+    el('p', { className: 'lab-help' }, 'Divide la pieza donde está el cursor y escribe letra o tablatura sobre el audio. La estructura se puede ajustar después.'),
+    sectionList, sectionEditor);
   const livePanel = el('section', { className: 'audio-live-panel', hidden: 'hidden', 'aria-label': 'Karaoke de análisis en vivo' });
   const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
   const liveReference = el('strong', { className: 'audio-live-reference' }, 'Referencia: —');
@@ -73,56 +93,130 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   liveMetrics.append(liveReference, liveTransition, liveGuess, liveSimilarity);
   const liveActions = el('footer', { className: 'audio-draft-actions' }); liveActions.append(liveStart, liveStop);
   const analyze = el('button', { type: 'button', className: 'btn-primary' }, 'Analizar archivo');
-  const create = el('button', { type: 'button', className: 'btn-primary', disabled: 'true' }, 'Crear borrador y calibrar');
+  const create = el('button', { type: 'button', className: 'btn-primary', disabled: 'true' }, 'Crear canción editable');
+  const saveLab = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Guardar laboratorio');
   const closeButton = el('button', { type: 'button', className: 'btn-secondary' }, 'Cerrar');
-  const dialog = el('dialog', { id: 'audio-draft-assistant', className: 'audio-draft-panel', 'aria-labelledby': 'audio-draft-heading' });
-  const heading = el('h2', { id: 'audio-draft-heading' }, 'Borrador desde audio local');
+  const editMode = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Escritura y calibración');
+  const stageMode = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Escenario');
+  const dialog = el('main', { id: 'audio-draft-assistant', className: 'sound-lab', 'aria-labelledby': 'audio-draft-heading' });
+  const heading = el('h1', { id: 'audio-draft-heading' }, 'Laboratorio del sonido');
   const form = el('div', { className: 'audio-draft-form' });
   const fileLabel = el('label', { for: 'audio-draft-file' }, 'Archivo de audio o video'); fileLabel.append(file);
   const titleLabel = el('label', { for: 'audio-draft-title' }, 'Título'); titleLabel.append(title);
   const artistLabel = el('label', { for: 'audio-draft-artist' }, 'Artista'); artistLabel.append(artist);
   const bpmLabel = el('label', { for: 'audio-draft-bpm' }, 'BPM (puedes corregir la sugerencia)'); bpmLabel.append(bpm);
-  const storeLabel = el('label', { for: 'audio-draft-store-audio', className: 'audio-draft-check' }, 'Guardar el archivo en el dispositivo junto con el borrador'); storeLabel.prepend(storeAudio);
-  form.append(fileLabel, titleLabel, artistLabel, bpmLabel, storeLabel);
-  const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, create, closeButton);
+  form.append(fileLabel, titleLabel, artistLabel, bpmLabel);
+  const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, saveLab, create);
   livePanel.append(el('h3', {}, 'Karaoke de análisis en vivo'),
     el('p', { className: 'audio-live-note' }, 'Inicia el micrófono y reproduce la pista para comparar la entrada con el tramo actual. Usa auriculares para que la pista no se filtre al micrófono. Se analiza localmente; el porcentaje compara perfiles de croma y no es una nota de ejecución. Si cantas una sola nota, puede faltar información para confirmar el acorde completo.'),
     liveStatus, liveMetrics, liveCompatibility, liveActions);
-  dialog.append(heading,
-    el('p', { className: 'audio-draft-note' }, 'El análisis estima tempo y armonía, pero puede equivocarse. Revisa el espectro, compara alternativas, escucha cada tramo y asigna tú el acorde antes de crear el borrador.'),
-    form, mediaPreview, status, preview, analysisPanel, livePanel, actions);
+  const labHeader = el('header', { className: 'lab-header' });
+  const modes = el('nav', { className: 'lab-mode-nav', 'aria-label': 'Vistas del proyecto' });
+  modes.append(el('span', { className: 'lab-mode-active', 'aria-current': 'page' }, 'Laboratorio'), editMode, stageMode);
+  labHeader.append(el('div', {}, ''), modes, closeButton);
+  labHeader.firstChild.append(heading, el('p', { className: 'audio-draft-note' }, 'Escucha, analiza y escribe sobre una misma pieza. Las notas y acordes detectados son hipótesis hasta que los revises.'));
+  const transport = el('section', { className: 'lab-transport', 'aria-label': 'Reproducción de la pista' });
+  transport.append(el('strong', {}, 'Pista original'), mediaPreview, transportStatus);
+  const sidebar = el('aside', { className: 'lab-sidebar' });
+  sidebar.append(el('h2', {}, 'Fuente y proyecto'), form, status, preview, actions, sectionPanel);
+  const workspace = el('div', { className: 'lab-workspace' }); workspace.append(sidebar, analysisPanel);
+  dialog.append(labHeader, transport, workspace, livePanel);
   document.body.append(dialog);
 
-  function cleanUp() {
+  function projectSnapshot() {
+    return { id: projectId, schemaVersion: 1, title: title.value.trim(), artist: artist.value.trim(),
+      bpm: Number(bpm.value) || analysis.bpm, updatedAt: new Date().toISOString(),
+      audioAssetId: projectAudioAssetId, fileName: selectedFile?.name || '',
+      songId: linkedSongId, selectedSectionId, analysis: structuredClone(analysis), sections: structuredClone(labSections) };
+  }
+  function persistProject() {
+    if (!analysis) return Promise.resolve();
+    if (!projectId) projectId = `lab-${crypto.randomUUID?.() || Date.now()}`;
+    if (selectedFile && !projectAudioAssetId) {
+      projectAudioAssetId = createAssetId();
+      pendingAsset = { id: projectAudioAssetId, blob: selectedFile, name: selectedFile.name,
+        mime: selectedFile.type || 'application/octet-stream', bytes: selectedFile.size,
+        duration: analysis.durationMs / 1000 };
+    }
+    const snapshot = projectSnapshot();
+    const assetToSave = pendingAsset;
+    pendingAsset = null;
+    saveQueue = saveQueue.catch(() => {}).then(async () => {
+      if (assetToSave) await saveLabProjectWithAsset(snapshot, assetToSave);
+      else await saveLabProject(snapshot);
+    });
+    return saveQueue.then(() => { status.textContent = 'Laboratorio guardado en este dispositivo.'; }, (error) => {
+      if (assetToSave) pendingAsset = assetToSave;
+      status.textContent = `No se pudo guardar el laboratorio: ${error?.message || error}`;
+      throw error;
+    });
+  }
+  function scheduleProjectSave() {
+    if (!analysis) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { saveTimer = null; persistProject().catch(() => {}); }, 500);
+  }
+  async function cleanUp() {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+    if (analysis) {
+      try { await persistProject(); } catch { return false; }
+    }
     if (playheadFrame !== null) cancelAnimationFrame(playheadFrame);
+    liveView?.dispose();
     liveCapture?.dispose(); liveCapture = null;
     mediaPlayer?.pause(); mediaPlayer = null;
     worker?.terminate(); worker = null;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
-    if (dialog.open) dialog.close();
-    dialog.remove(); onClose();
+    dialog.remove(); document.getElementById('app').style.display = ''; onClose();
+    return true;
   }
   function fail(error) {
     worker?.terminate(); worker = null;
-    decoded = null; analysis = null;
+    decoded = null;
     status.textContent = error?.message || 'No se pudo completar el análisis.';
-    busy = false; analyze.disabled = false; create.disabled = true;
+    busy = false; analyze.disabled = false; create.disabled = !analysis;
   }
   function playbackPositionMs() { return Math.max(0, (mediaPlayer?.currentTime || 0) * 1000); }
+  function playRange(startMs, endMs, label) {
+    if (!mediaPlayer) {
+      transportStatus.textContent = 'Este proyecto no tiene audio local. Carga la pista para escucharlo.';
+      liveView?.setAuditionStatus(transportStatus.textContent);
+      return;
+    }
+    const token = ++auditionToken;
+    auditionEndMs = endMs;
+    auditionArmed = false;
+    transportStatus.textContent = `Cargando ${label}…`;
+    liveView?.setAuditionStatus(transportStatus.textContent);
+    try { mediaPlayer.currentTime = startMs / 1000; }
+    catch {
+      mediaPlayer.addEventListener('loadedmetadata', () => {
+        if (token === auditionToken) mediaPlayer.currentTime = startMs / 1000;
+      }, { once: true });
+    }
+    const playback = mediaPlayer.play();
+    Promise.resolve(playback).then(() => {
+      if (token !== auditionToken) return;
+      auditionArmed = true;
+      transportStatus.textContent = `Sonando ${label} · ${Math.round(startMs / 1000)}–${Math.round(endMs / 1000)} s`;
+      liveView?.setAuditionStatus(transportStatus.textContent);
+    }, (error) => {
+      if (token !== auditionToken) return;
+      auditionEndMs = null;
+      auditionArmed = false;
+      transportStatus.textContent = `No se pudo reproducir: ${error?.message || 'revisa el archivo de audio'}.`;
+      liveView?.setAuditionStatus(transportStatus.textContent);
+    });
+    livePlayerEvents();
+  }
   function playAnalysisSegment(segment) {
-    if (!mediaPlayer || !analysis || !segment) return;
+    if (!analysis || !segment) return;
     const index = analysis.chordCandidates.indexOf(segment);
     const range = getAuditionRange(analysis.chordCandidates, index);
     if (!range) return;
-    auditionEndMs = range.endMs;
-    mediaPlayer.currentTime = range.startMs / 1000;
-    liveView?.setAuditionStatus(`Reproduciendo ${range.symbol ? `${range.symbol} · ` : ''}${(range.endMs - range.startMs) / 1000 < 1 ? 'tramo' : 'pasaje'} seleccionado.`);
-    const playback = mediaPlayer.play();
-    if (playback?.catch) playback.catch(() => {
-      auditionEndMs = null;
-      liveView?.setAuditionStatus('No se pudo reproducir. Pulsa reproducir en el control de audio e inténtalo de nuevo.');
-    });
-    livePlayerEvents();
+    selectedSectionId = sectionAt(labSections, range.startMs)?.id || null;
+    renderSections();
+    playRange(range.startMs, range.endMs, `tramo ${index + 1}${range.symbol ? ` · ${range.symbol}` : ''}`);
   }
   function currentSegment() {
     return segmentAt(playbackPositionMs());
@@ -131,6 +225,58 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     return analysis?.chordCandidates.find((segment) => position >= segment.startMs && position < segment.endMs)
       || analysis?.chordCandidates.at(-1) || null;
   }
+  function renderSections() {
+    sectionList.replaceChildren(); sectionEditor.replaceChildren();
+    if (!labSections.length) {
+      sectionEditor.append(el('p', { className: 'lab-help' }, 'Analiza una pista para comenzar a escribir.'));
+      return;
+    }
+    const format = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
+    for (const section of labSections) {
+      const button = el('button', { type: 'button', className: 'lab-section-button' },
+        `${section.label} · ${format(section.startMs)}–${format(section.endMs)}`);
+      button.setAttribute('aria-current', section.id === selectedSectionId ? 'true' : 'false');
+      button.addEventListener('click', () => {
+        selectedSectionId = section.id; renderSections();
+        liveView?.selectSegmentAt(section.startMs);
+        playRange(section.startMs, section.endMs, `sección ${section.label}`);
+      });
+      sectionList.append(button);
+    }
+    const section = labSections.find((item) => item.id === selectedSectionId) || labSections[0];
+    selectedSectionId = section.id;
+    const split = el('button', { type: 'button', className: 'btn-secondary' }, 'Dividir aquí');
+    split.addEventListener('click', () => {
+      const at = Math.round(liveView?.getSelectedSegment()?.startMs ?? playbackPositionMs());
+      if (!splitLabSection(labSections, at)) {
+        status.textContent = 'El cursor debe estar dentro de una sección, al menos medio segundo después del inicio y antes del final.';
+        return;
+      }
+      selectedSectionId = sectionAt(labSections, at)?.id || null;
+      renderSections(); scheduleProjectSave(); liveView?.refreshDetail();
+    });
+    const name = el('input', { type: 'text', maxlength: 80, value: section.label, 'aria-label': 'Nombre de sección' });
+    name.addEventListener('input', () => { section.label = name.value; scheduleProjectSave(); });
+    name.addEventListener('change', renderSections);
+    const type = el('select', { 'aria-label': 'Tipo de sección' });
+    [['instrumental', 'Instrumental'], ['intro', 'Introducción'], ['verse', 'Verso'], ['prechorus', 'Preestribillo'],
+      ['chorus', 'Estribillo'], ['bridge', 'Puente'], ['solo', 'Solo'], ['outro', 'Final'], ['other', 'Otra']]
+      .forEach(([value, label]) => type.add(new Option(label, value)));
+    type.value = section.type;
+    type.addEventListener('change', () => { section.type = type.value; scheduleProjectSave(); });
+    const lyric = el('textarea', { rows: 5, maxlength: 2000, placeholder: 'Escribe la letra de esta sección…', 'aria-label': 'Letra de la sección' });
+    lyric.value = section.lyric || '';
+    lyric.addEventListener('input', () => { section.lyric = lyric.value; scheduleProjectSave(); });
+    const tab = el('textarea', { rows: 5, maxlength: 20000, placeholder: 'Tablatura ASCII escrita por ti…', 'aria-label': 'Tablatura de la sección' });
+    tab.value = section.tab || '';
+    tab.addEventListener('input', () => { section.tab = tab.value; scheduleProjectSave(); });
+    tab.addEventListener('change', () => liveView?.refreshDetail());
+    const field = (label, control) => { const wrapper = el('label', { className: 'lab-field' }, label); wrapper.append(control); return wrapper; };
+    sectionEditor.append(el('div', { className: 'lab-section-editor-head' }, ''),
+      field('Nombre', name), field('Tipo', type), field('Letra', lyric), field('Tablatura', tab));
+    sectionEditor.firstChild.append(el('strong', {}, 'Editar sección'), split);
+  }
+  renderSections();
   function updateLiveReference() {
     const segment = currentSegment();
     if (!segment) return;
@@ -172,20 +318,22 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   }
   function updatePlayhead() {
     if (!mediaPlayer || !analysis) return;
-    if (auditionEndMs !== null && playbackPositionMs() >= auditionEndMs) {
+    if (auditionEndMs !== null && auditionArmed && !mediaPlayer.seeking && !mediaPlayer.paused && playbackPositionMs() >= auditionEndMs) {
       const endMs = auditionEndMs;
       auditionEndMs = null;
+      auditionArmed = false;
       mediaPlayer.pause();
       mediaPlayer.currentTime = endMs / 1000;
-      liveView?.setPlaybackPosition(endMs);
-      liveView?.setAuditionStatus('Fin del pasaje. Pulsa “Escuchar tramo seleccionado” para repetirlo.');
+      liveView?.setPlaybackPosition(Math.max(0, endMs - 1), { followSelection: false });
+      transportStatus.textContent = 'Fin del pasaje. Selecciona otro tramo o pulsa escuchar para repetir.';
+      liveView?.setAuditionStatus(transportStatus.textContent);
       playheadFrame = null;
       return;
     }
     const now = performance.now();
     if (now - lastPlayheadDrawAt >= 75) {
       lastPlayheadDrawAt = now;
-      liveView?.setPlaybackPosition(playbackPositionMs());
+      liveView?.setPlaybackPosition(playbackPositionMs(), { followSelection: auditionEndMs === null });
     }
     const segment = currentSegment();
     if (segment && segment.startMs !== lastLiveSegmentStartMs) {
@@ -197,27 +345,63 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     else playheadFrame = null;
   }
   file.addEventListener('change', () => {
+    if (analysis) persistProject().catch(() => {});
     liveCapture?.dispose(); liveCapture = null; liveStop.disabled = true; liveStart.disabled = false;
-    livePanel.hidden = true; liveView = null; liveScores = []; lastLiveSegmentStartMs = null;
+    livePanel.hidden = true; liveView?.dispose(); liveView = null; liveScores = []; lastLiveSegmentStartMs = null;
+    auditionEndMs = null; auditionArmed = false; auditionToken++; projectId = null; projectAudioAssetId = null; pendingAsset = null; linkedSongId = null;
+    editMode.disabled = true; stageMode.disabled = true;
+    labSections = []; selectedSectionId = null; renderSections();
     mediaPlayer?.pause(); mediaPlayer = null; playheadMediaPlayer = null;
-    selectedFile = file.files?.[0] || null; decoded = null; analysis = null; create.disabled = true;
-    analysisPanel.replaceChildren(); mediaPreview.replaceChildren(); mediaPlayer = null;
+    selectedFile = file.files?.[0] || null; decoded = null; waveform = []; analysis = null; create.disabled = true;
+    analysisPanel.replaceChildren(el('div', { className: 'lab-empty-map' }, 'Carga una pista y pulsa «Analizar archivo» para construir el mapa del sonido.'));
+    mediaPreview.replaceChildren(); mediaPlayer = null;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     if (!selectedFile) return;
     mediaUrl = URL.createObjectURL(selectedFile);
     mediaPlayer = document.createElement(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
     mediaPlayer.controls = true; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
     mediaPreview.append(mediaPlayer);
+    transportStatus.textContent = `Pista lista: ${selectedFile.name}`;
     title.value = selectedFile.name.replace(/\.[^.]+$/, '').slice(0, 200);
     preview.textContent = `${selectedFile.name} · ${(selectedFile.size / 1024 / 1024).toFixed(1)} MiB`;
     status.textContent = 'Archivo elegido. Pulsa Analizar archivo para decodificarlo localmente.';
   });
+  function refreshAnalysisSummary() {
+    if (!analysis) return;
+    analysis.chordSuggestions = analysis.chordCandidates.filter((segment) => segment.selectedSymbol)
+      .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
+    const unassigned = analysis.chordCandidates.length - analysis.chordSuggestions.length;
+    preview.textContent = `${selectedFile?.name || 'Pista no vinculada'}\nDuración: ${(analysis.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(analysis.bpm) ? analysis.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${analysis.beats?.length || 0}\nTramos estudiables: ${analysis.chordCandidates.length}\nAcordes elegidos: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}`;
+  }
+  function showAnalysis(data, { restored = false } = {}) {
+    analysis = data;
+    if (!labSections.length) labSections = initialLabSections(analysis.durationMs);
+    if (!labSections.some((section) => section.id === selectedSectionId)) selectedSectionId = labSections[0]?.id || null;
+    refreshAnalysisSummary(); renderSections();
+    const analysisView = createAudioAnalysisVisualizer({
+      analysis,
+      onChange: () => { refreshAnalysisSummary(); updateLiveReference(); scheduleProjectSave(); },
+      onSelect: playAnalysisSegment,
+      getSection: (positionMs) => sectionAt(labSections, positionMs),
+    });
+    liveView?.dispose(); analysisPanel.replaceChildren(analysisView.element);
+    liveView = analysisView;
+    livePanel.hidden = false;
+    livePlayerEvents(true);
+    if (!restored) bpm.value = Number.isFinite(data.bpm) && data.bpm >= 20 && data.bpm <= 300 ? data.bpm.toFixed(2) : '';
+    status.textContent = restored
+      ? 'Análisis recuperado. Selecciona un tramo para escucharlo o edita la estructura y la letra.'
+      : 'Análisis listo. Selecciona un tramo para escucharlo; escribe y guarda el proyecto para volver más tarde.';
+    busy = false; analyze.disabled = false; create.disabled = false; saveLab.disabled = false;
+    editMode.disabled = !linkedSongId; stageMode.disabled = !linkedSongId;
+  }
   analyze.addEventListener('click', async () => {
     if (!selectedFile || busy) return;
     busy = true; analyze.disabled = true; create.disabled = true;
     status.textContent = 'Decodificando el archivo local…';
     try {
       decoded = await decodeLocalFile(selectedFile);
+      waveform = buildWaveformEnvelope(decoded.pcm);
       status.textContent = `Audio decodificado · ${Math.round(decoded.durationMs / 1000)} s. Cargando analizador opcional…`;
       worker?.terminate(); worker = new Worker(ANALYSIS_WORKER_URL, { type: 'module' });
       worker.onmessage = ({ data }) => {
@@ -227,30 +411,9 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
         } else if (data.type === 'warning') {
           status.textContent += `\n${data.message}`;
         } else if (data.type === 'analysis') {
-          analysis = data;
-          analysis.chordSuggestions = analysis.chordCandidates
-            .filter((segment) => segment.selectedSymbol)
-            .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
-          const analysisView = createAudioAnalysisVisualizer({
-            analysis,
-            onChange: () => {
-              analysis.chordSuggestions = analysis.chordCandidates.filter((segment) => segment.selectedSymbol)
-                .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
-              const unassigned = analysis.chordCandidates.length - analysis.chordSuggestions.length;
-              preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
-              updateLiveReference();
-            },
-            onSelect: playAnalysisSegment,
-          });
-          analysisPanel.replaceChildren(analysisView.element);
-          liveView = analysisView;
-          livePanel.hidden = false;
-          livePlayerEvents(true);
-          bpm.value = Number.isFinite(data.bpm) && data.bpm >= 20 && data.bpm <= 300 ? data.bpm.toFixed(2) : '';
-          const unassigned = data.chordCandidates.length - analysis.chordSuggestions.length;
-          preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados inicialmente: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
-          status.textContent = 'Recorre el mapa, selecciona cada tramo y confirma o corrige el acorde. Al elegir un tramo puedes reproducir desde ese punto.';
-          busy = false; analyze.disabled = false; create.disabled = false;
+          data.waveform = waveform;
+          showAnalysis(data);
+          persistProject().catch(() => {});
           worker.terminate(); worker = null;
         } else if (data.type === 'error') fail(new Error(data.message));
       };
@@ -268,12 +431,18 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
       playheadMediaPlayer = mediaPlayer;
       ['play', 'pause', 'seeked', 'timeupdate', 'ended'].forEach((name) => mediaPlayer.addEventListener(name, (event) => {
         if (event.type === 'pause' && auditionEndMs !== null && playbackPositionMs() < auditionEndMs) {
-          auditionEndMs = null;
-          liveView?.setAuditionStatus('Escucha detenida. Pulsa “Escuchar tramo seleccionado” para volver a oírlo.');
+          auditionEndMs = null; auditionArmed = false; auditionToken++;
+          transportStatus.textContent = 'Escucha pausada. Selecciona el tramo para volver a oírlo.';
+          liveView?.setAuditionStatus(transportStatus.textContent);
         }
         if (event.type === 'ended' && auditionEndMs !== null) {
-          auditionEndMs = null;
-          liveView?.setAuditionStatus('Fin del audio. Selecciona otro tramo o vuelve al inicio para escucharlo.');
+          auditionEndMs = null; auditionArmed = false;
+          transportStatus.textContent = 'Fin del audio. Selecciona otro tramo para escucharlo.';
+          liveView?.setAuditionStatus(transportStatus.textContent);
+        }
+        if (event.type === 'play' && auditionEndMs === null) transportStatus.textContent = 'Reproduciendo la pista completa.';
+        if (event.type === 'pause' && auditionEndMs === null && !transportStatus.textContent.startsWith('Fin')) {
+          transportStatus.textContent = 'Pista pausada.';
         }
         callback();
       }));
@@ -341,6 +510,18 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     liveStatus.textContent = 'Micrófono apagado';
     liveInputQuality = 'low';
   });
+  saveLab.addEventListener('click', () => { persistProject().catch(() => {}); });
+  async function openLinkedView(openView) {
+    if (!linkedSongId || !projectId) return;
+    const song = await getSongV2(linkedSongId);
+    if (!song) { status.textContent = 'La canción enlazada ya no existe. Crea otra desde este laboratorio.'; return; }
+    const returnToLab = () => openAudioDraftAssistant({ projectId, onClose });
+    if (!await cleanUp()) return;
+    await openView(song, returnToLab);
+  }
+  editMode.addEventListener('click', () => { openLinkedView(openCalibrationEditor).catch((error) => { status.textContent = error.message; }); });
+  stageMode.addEventListener('click', () => { openLinkedView(openPlayerView).catch((error) => { status.textContent = error.message; }); });
+  [title, artist, bpm].forEach((input) => input.addEventListener('change', scheduleProjectSave));
   create.addEventListener('click', async () => {
     if (!analysis || busy) return;
     const bpmValue = Number(bpm.value);
@@ -349,24 +530,66 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     }
     busy = true; create.disabled = true;
     try {
-      const asset = storeAudio.checked ? { id: createAssetId(), blob: selectedFile, name: selectedFile.name,
-        mime: selectedFile.type || 'application/octet-stream', bytes: selectedFile.size, duration: decoded.durationMs / 1000 } : null;
-      const doc = buildAudioDraft({ title: title.value, artist: artist.value, durationMs: analysis.durationMs,
+      await persistProject();
+      const doc = buildLabSong({ title: title.value, artist: artist.value, durationMs: analysis.durationMs,
         bpm: bpmValue, chordSuggestions: analysis.chordSuggestions,
         uncertainChordCount: analysis.chordCandidates.length - analysis.chordSuggestions.length,
-        audioAssetId: asset?.id || null });
+        audioAssetId: projectAudioAssetId, sections: labSections });
       const collision = await import('./importDialog.js').then(({ askCollision }) => askCollision);
-      const result = await importSongV2Document(doc, collision, asset);
+      const result = await importSongV2Document(doc, collision);
       if (result.status === 'invalid') throw new Error(result.errors.map((item) => `${item.instancePath}: ${item.message}`).join('\n'));
       if (result.status === 'cancelled') { busy = false; create.disabled = false; return; }
+      linkedSongId = result.id;
+      await persistProject();
       const saved = await getSongV2(result.id);
-      cleanUp();
-      await openCalibrationEditor(saved, onClose);
-    } catch (error) { fail(error); }
+      if (!await cleanUp()) throw new Error('No se pudo cerrar el laboratorio porque falló el guardado.');
+      await openCalibrationEditor(saved, () => openAudioDraftAssistant({ projectId, onClose }));
+    } catch (error) {
+      status.textContent = error?.message || 'No se pudo crear la canción.';
+      busy = false; create.disabled = false;
+    }
   });
   closeButton.addEventListener('click', cleanUp);
-  dialog.addEventListener('cancel', (event) => { event.preventDefault(); cleanUp(); });
-  dialog.showModal();
+  document.getElementById('app').style.display = 'none';
+  function attachStoredAsset(asset, fallbackName = 'pista') {
+    selectedFile = new File([asset.blob], asset.name || fallbackName, { type: asset.mime || asset.blob.type });
+    mediaUrl = URL.createObjectURL(asset.blob);
+    mediaPlayer = document.createElement((asset.mime || '').startsWith('video/') ? 'video' : 'audio');
+    mediaPlayer.controls = true; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
+    mediaPreview.append(mediaPlayer);
+    transportStatus.textContent = `Pista local recuperada: ${selectedFile.name}`;
+  }
+  if (existingProjectId) {
+    try {
+      const project = await getLabProject(existingProjectId);
+      if (!project) throw new Error('No se encontró el proyecto de laboratorio.');
+      title.value = project.title || ''; artist.value = project.artist || '';
+      bpm.value = Number.isFinite(project.bpm) ? String(project.bpm) : '';
+      labSections = project.sections?.length ? project.sections : initialLabSections(project.analysis.durationMs);
+      selectedSectionId = project.selectedSectionId || null;
+      projectAudioAssetId = project.audioAssetId || null;
+      linkedSongId = project.songId || null;
+      if (projectAudioAssetId) {
+        const asset = await getAsset(projectAudioAssetId);
+        if (asset?.blob) attachStoredAsset(asset, project.fileName);
+        else transportStatus.textContent = 'El análisis se recuperó, pero falta el archivo de audio local.';
+      } else transportStatus.textContent = 'Este análisis se guardó sin pista. Elige un archivo y vuelve a analizarlo para escuchar.';
+      showAnalysis(project.analysis, { restored: true });
+    } catch (error) { status.textContent = error?.message || 'No se pudo abrir el laboratorio.'; }
+  } else if (songId) {
+    try {
+      const song = await getSongV2(songId);
+      if (!song) throw new Error('No se encontró la canción.');
+      title.value = song.metadata.title; artist.value = song.metadata.artist || '';
+      bpm.value = String(song.metadata.bpm);
+      linkedSongId = song.id;
+      const asset = song.audio?.assetId ? await getAsset(song.audio.assetId) : null;
+      if (!asset?.blob) throw new Error('Esta canción no tiene el audio local disponible para analizar.');
+      projectAudioAssetId = asset.id;
+      attachStoredAsset(asset);
+      status.textContent = 'Pista de la canción vinculada. Pulsa «Analizar archivo» para abrirla en el laboratorio.';
+    } catch (error) { status.textContent = error?.message || 'No se pudo preparar el audio de la canción.'; }
+  }
   title.focus();
   return { close: cleanUp };
 }

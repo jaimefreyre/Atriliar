@@ -1,11 +1,12 @@
 const DB_NAME = 'StagePrompterDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORE_SONGS = 'songs';       // v1 legacy, contenido intacto
 const STORE_SONGS_V2 = 'songsV2';
 const STORE_ASSETS = 'assets';
 const STORE_SETLISTS = 'setlists';
 const STORE_SETTINGS = 'settings';
+const STORE_LAB_PROJECTS = 'labProjects';
 
 let dbPromise = null;
 
@@ -30,6 +31,7 @@ function getDB() {
         if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(STORE_SETLISTS)) db.createObjectStore(STORE_SETLISTS, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
+        if (!db.objectStoreNames.contains(STORE_LAB_PROJECTS)) db.createObjectStore(STORE_LAB_PROJECTS, { keyPath: 'id' });
       };
 
       request.onsuccess = (e) => {
@@ -145,6 +147,37 @@ export async function getAsset(id) {
 }
 export async function deleteAsset(id) {
   return runInStore(STORE_ASSETS, 'readwrite', s => s.delete(id));
+}
+
+// --- proyectos del laboratorio (análisis y decisiones separados del SongDocument portable) ---
+export async function getAllLabProjects() {
+  return runInStore(STORE_LAB_PROJECTS, 'readonly', s => s.getAll());
+}
+export async function getLabProject(id) {
+  return runInStore(STORE_LAB_PROJECTS, 'readonly', s => s.get(id));
+}
+export async function saveLabProject(project) {
+  return runInStore(STORE_LAB_PROJECTS, 'readwrite', s => s.put(project));
+}
+export async function saveLabProjectWithAsset(project, asset) {
+  return runInStores([STORE_LAB_PROJECTS, STORE_ASSETS], 'readwrite', (stores) => {
+    stores[STORE_LAB_PROJECTS].put(project);
+    stores[STORE_ASSETS].put(asset);
+  });
+}
+export async function deleteLabProject(id) {
+  const project = await getLabProject(id);
+  if (!project) return;
+  const assetId = project.audioAssetId;
+  if (!assetId) return runInStore(STORE_LAB_PROJECTS, 'readwrite', s => s.delete(id));
+  const [songs, projects] = await Promise.all([getAllSongsV2(), getAllLabProjects()]);
+  const shared = songs.some((song) => song.audio?.assetId === assetId)
+    || projects.some((other) => other.id !== id && other.audioAssetId === assetId);
+  if (shared) return runInStore(STORE_LAB_PROJECTS, 'readwrite', s => s.delete(id));
+  return runInStores([STORE_LAB_PROJECTS, STORE_ASSETS], 'readwrite', (stores) => {
+    stores[STORE_LAB_PROJECTS].delete(id);
+    stores[STORE_ASSETS].delete(assetId);
+  });
 }
 
 // --- settings (preferencias, y hash de revisión local `review:<songId>`) ---

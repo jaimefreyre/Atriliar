@@ -1,5 +1,6 @@
 ﻿import { getAllSongs, saveSong, deleteSong, getAllSongsV2, deleteSongV2, getSongV2 } from './data/indexedDb.js';
 import { validateSong, detectSongFormat } from './data/songValidator.js';
+import { getAllLabProjects, deleteLabProject } from './data/indexedDb.js';
 import { buildBackup, isBackupDocument } from './data/backup.js';
 import { initializeOffline } from './data/offline.js';
 import { migrateLegacySong } from './data/legacyImporter.js';
@@ -19,6 +20,7 @@ window.stage = { adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, n
 
 let songs = [];
 let songsV2 = [];
+let labProjects = [];
 
 function buildBadge(text, extraClass) {
   const span = document.createElement('span');
@@ -92,6 +94,9 @@ function renderV2SongItem(song) {
 
   const actions = document.createElement('div');
   actions.className = 'song-actions';
+  const linkedLab = labProjects.find((project) => project.songId === song.id);
+  if (linkedLab) actions.appendChild(buildActionButton('🎧 LABORATORIO', 'open-lab', linkedLab.id));
+  else if (song.audio) actions.appendChild(buildActionButton('🎧 ANALIZAR AUDIO', 'open-lab-song', song.id));
   actions.appendChild(buildActionButton('▶ REPRODUCIR', 'play-v2', song.id, 'btn-stage'));
   actions.appendChild(buildActionButton('🎚️ CALIBRAR', 'calibrate-v2', song.id));
   actions.appendChild(buildActionButton('🗑️', 'delete-v2', song.id, 'btn-danger'));
@@ -102,6 +107,34 @@ function renderV2SongItem(song) {
 async function loadLibrary() {
   try { songs = await getAllSongs(); } catch (err) { console.error('❌ Error al cargar canciones v1:', err); songs = []; }
   try { songsV2 = await getAllSongsV2(); } catch (err) { console.error('❌ Error al cargar canciones v2:', err); songsV2 = []; }
+  try { labProjects = await getAllLabProjects(); } catch (err) { console.error('❌ Error al cargar laboratorios:', err); labProjects = []; }
+
+  const projectList = document.getElementById('lab-project-list');
+  projectList.replaceChildren();
+  if (!labProjects.length) {
+    const empty = document.createElement('p'); empty.className = 'empty';
+    empty.textContent = 'Carga un audio para crear un mapa que podrás volver a estudiar y editar.';
+    projectList.append(empty);
+  }
+  labProjects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).forEach((project) => {
+    const item = document.createElement('div'); item.className = 'song-item';
+    const info = document.createElement('div'); info.className = 'song-info';
+    const name = document.createElement('strong'); name.textContent = project.title || 'Análisis sin título';
+    const subtitle = document.createElement('span');
+    subtitle.textContent = `${project.artist || 'Artista sin indicar'} · ${Math.round((project.analysis?.durationMs || 0) / 1000)} s · ${project.analysis?.chordCandidates?.length || 0} tramos`;
+    info.append(name, subtitle, buildBadge('Laboratorio v2'));
+    const actions = document.createElement('div'); actions.className = 'song-actions';
+    actions.append(buildActionButton('Abrir laboratorio', 'open-lab', project.id, 'btn-stage'), buildActionButton('🗑️', 'delete-lab', project.id, 'btn-danger'));
+    item.append(info, actions); projectList.append(item);
+  });
+  projectList.onclick = async (event) => {
+    const button = event.target.closest('button'); if (!button) return;
+    const id = button.dataset.id;
+    if (button.dataset.action === 'open-lab') await openAudioDraftAssistant({ projectId: id, onClose: loadLibrary });
+    if (button.dataset.action === 'delete-lab' && confirm('¿Eliminar este proyecto de análisis? La canción guardada se conservará.')) {
+      await deleteLabProject(id); await loadLibrary();
+    }
+  };
 
   const list = document.getElementById('song-list');
   if (!list) { console.error('❌ No existe #song-list'); return; }
@@ -135,6 +168,10 @@ async function loadLibrary() {
     } else if (action === 'play-v2') {
       const song = songsV2.find(s => s.id === id);
       if (song) await openPlayerView(song, loadLibrary);
+    } else if (action === 'open-lab') {
+      await openAudioDraftAssistant({ projectId: id, onClose: loadLibrary });
+    } else if (action === 'open-lab-song') {
+      await openAudioDraftAssistant({ songId: id, onClose: loadLibrary });
     } else if (action === 'stage') {
       const song = songs.find(s => s.id === id);
       if (song) await openLegacyThroughV2(song, openPlayerView);
@@ -166,8 +203,8 @@ document.getElementById('btn-new').addEventListener('click', async () => {
   await openCalibrationEditor(blank, loadLibrary);
 });
 
-document.getElementById('btn-audio-draft').addEventListener('click', () => {
-  openAudioDraftAssistant({ onClose: loadLibrary });
+document.getElementById('btn-audio-draft').addEventListener('click', async () => {
+  await openAudioDraftAssistant({ onClose: loadLibrary });
 });
 
 document.getElementById('btn-export-backup').addEventListener('click', async () => {
