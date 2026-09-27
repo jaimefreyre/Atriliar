@@ -356,6 +356,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     editMode.disabled = true; stageMode.disabled = true;
     labSections = []; selectedSectionId = null; renderSections();
     mediaPlayer?.pause(); mediaPlayer = null; playheadMediaPlayer = null;
+    transport.querySelector('.analysis-waveform')?.remove();
+    transport.querySelector('.harmonic-history-host')?.remove();
     selectedFile = file.files?.[0] || null; decoded = null; waveform = []; analysis = null; create.disabled = true;
     analysisPanel.replaceChildren(el('div', { className: 'lab-empty-map' }, 'Carga una pista y pulsa «Analizar archivo» para construir el mapa del sonido.'));
     mediaPreview.replaceChildren(); mediaPlayer = null;
@@ -390,8 +392,10 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     });
     liveView?.dispose();
     transport.querySelector('.analysis-waveform')?.remove();
+    transport.querySelector('.harmonic-history-host')?.remove();
     analysisPanel.replaceChildren(analysisView.element);
     transport.insertBefore(analysisView.waveformCanvas, mediaPreview);
+    transport.insertBefore(analysisView.historyElement, mediaPreview);
     const sectionMap = el('section', { className: 'analysis-authored-sections', 'aria-label': 'Secciones de la canción' });
     sectionMap.append(el('h4', {}, 'Secciones'), sectionList);
     analysisView.element.insertBefore(sectionMap, analysisView.element.querySelector('.analysis-instruments'));

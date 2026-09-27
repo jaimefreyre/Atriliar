@@ -44,15 +44,37 @@ function getCurrentFrame(analysis, positionMs, segment) {
       const middle = (low + high) >> 1;
       if (frames[middle].timeMs <= positionMs) { best = middle; low = middle + 1; } else high = middle - 1;
     }
-    return frames[best];
+    const frame = frames[best];
+    if (segment && (frame.timeMs < segment.startMs || frame.timeMs >= segment.endMs)) {
+      return { timeMs: positionMs, peaks: segment.spectralPeaks || [] };
+    }
+    return frame;
   }
   return segment ? { timeMs: positionMs, peaks: segment.spectralPeaks || [] } : null;
+}
+
+function getChordPitches(segment, frame) {
+  const symbol = segment?.selectedSymbol || segment?.symbol || '';
+  const chord = getChordTones(symbol);
+  if (!chord.recognized) return [];
+  const peakList = frame?.peaks?.length ? frame.peaks : segment?.spectralPeaks || [];
+  return chord.tones.slice(0, 3).map((pitchClass) => {
+    const fromFrame = peakList
+      .filter((peak) => Number.isFinite(peak.midi) && ((peak.midi % 12) + 12) % 12 === pitchClass)
+      .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+    if (fromFrame) return fromFrame;
+    return (segment?.spectralPeaks || [])
+      .filter((peak) => Number.isFinite(peak.midi) && ((peak.midi % 12) + 12) % 12 === pitchClass)
+      .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0] || null;
+  })
+    .filter(Boolean)
+    .sort((a, b) => a.midi - b.midi);
 }
 
 /** Circle-of-fifths plus a time-aligned spectral map for the selected analysis. */
 export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0 }) {
   const root = makeNode('section', 'harmonic-dashboard');
-  root.setAttribute('aria-label', 'Círculo de quintas y espectrograma');
+  root.setAttribute('aria-label', 'Círculo de quintas y picos del tramo actual');
   const circleColumn = makeNode('div', 'harmonic-circle-column');
   const circleTitle = makeNode('h5', '', 'Círculo de quintas');
   const svg = makeSvg('svg', { class: 'harmonic-fifths-svg', viewBox: '0 0 280 280', role: 'img', 'aria-labelledby': 'harmonic-wheel-title harmonic-wheel-desc' });
@@ -78,22 +100,30 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
 
   const spectrumColumn = makeNode('div', 'harmonic-spectrum-column');
   const spectrumHeading = makeNode('div', 'harmonic-spectrum-heading');
-  const spectrumTitle = makeNode('h5', '', 'Espectrograma de la pieza');
+  const spectrumTitle = makeNode('h5', '', 'Picos del tramo actual');
   const spectrumTime = makeNode('span', 'harmonic-spectrum-time', '0:00');
   spectrumHeading.append(spectrumTitle, spectrumTime);
-  const canvas = makeNode('canvas', 'harmonic-spectrogram');
-  canvas.setAttribute('role', 'img');
-  canvas.setAttribute('aria-label', 'Espectrograma temporal de picos graves y agudos. La línea vertical sigue el audio.');
   const peakReadout = makeNode('div', 'harmonic-peak-readout');
   const constellation = makeNode('div', 'harmonic-constellation-readout');
-  spectrumColumn.append(spectrumHeading, canvas, peakReadout, constellation);
+  spectrumColumn.append(spectrumHeading, peakReadout, constellation);
   root.append(circleColumn, spectrumColumn);
+
+  const historyElement = makeNode('section', 'harmonic-history-dock');
+  historyElement.setAttribute('aria-label', 'Recorrido armónico a lo largo de la canción');
+  const historyHeading = makeNode('div', 'harmonic-history-heading');
+  historyHeading.append(makeNode('h4', '', 'Recorrido armónico · alturas probables del acorde'));
+  const historyLegend = makeNode('div', 'harmonic-history-legend');
+  historyHeading.append(historyLegend);
+  const historyCanvas = makeNode('canvas', 'harmonic-history-canvas');
+  historyCanvas.setAttribute('role', 'img');
+  historyCanvas.setAttribute('aria-label', 'Tres líneas muestran las alturas probables de las notas del acorde a lo largo de la canción. El eje vertical empieza en la nota más grave detectada.');
+  historyElement.append(historyHeading, historyCanvas);
 
   let resizeObserver = null;
   let currentSegment = segment;
   let currentPositionMs = playbackPositionMs;
   let liveFrame = null;
-  let lastCanvasDraw = 0;
+  let lastHistoryDraw = 0;
 
   function updateCircle(nextSegment, frame) {
     ringGroup.replaceChildren(); pointsGroup.replaceChildren(); chordNotes.replaceChildren();
@@ -158,54 +188,65 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     return pointsByRegister;
   }
 
-  function drawSpectrogram(now = performance.now()) {
-    if (now - lastCanvasDraw < 120) return;
-    lastCanvasDraw = now;
-    const rect = canvas.getBoundingClientRect();
+  function drawHarmonicHistory(now = performance.now()) {
+    if (now - lastHistoryDraw < 100) return;
+    lastHistoryDraw = now;
+    const rect = historyCanvas.getBoundingClientRect();
     if (!rect.width) return;
     const ratio = window.devicePixelRatio || 1;
     const width = Math.max(220, Math.floor(rect.width));
-    const height = 172;
-    canvas.width = Math.floor(width * ratio); canvas.height = Math.floor(height * ratio);
-    const ctx = canvas.getContext('2d'); ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const height = 124;
+    historyCanvas.width = Math.floor(width * ratio); historyCanvas.height = Math.floor(height * ratio);
+    const ctx = historyCanvas.getContext('2d'); ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.fillStyle = '#08110d'; ctx.fillRect(0, 0, width, height);
-    const left = 34, right = width - 8, top = 8, bottom = height - 24;
+    const left = 58, right = width - 12, top = 8, bottom = height - 23;
     const plotWidth = right - left, plotHeight = bottom - top;
-    const minMidi = 28, maxMidi = 96;
-    ctx.font = '9px system-ui,sans-serif'; ctx.textAlign = 'right';
-    for (let midi = 36; midi <= maxMidi; midi += 12) {
-      const y = bottom - (midi - minMidi) / (maxMidi - minMidi) * plotHeight;
-      ctx.strokeStyle = 'rgba(176,198,184,.15)'; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
-      ctx.fillStyle = '#a7b9ab'; ctx.fillText(`${NOTES[midi % 12]}${Math.floor(midi / 12) - 1}`, left - 4, y + 3);
-    }
     const duration = Math.max(1, analysis.durationMs || 1);
-    const frames = analysis.spectralFrames;
-    if (frames?.length) {
-      const cellWidth = Math.max(1, plotWidth * (frames[1]?.timeMs - frames[0]?.timeMs || 180) / duration + .5);
-      for (const frame of frames) {
-        const x = left + clamp(frame.timeMs / duration, 0, 1) * plotWidth;
-        for (const peak of frame.peaks || []) {
-          if (peak.midi < minMidi || peak.midi > maxMidi) continue;
-          const y = bottom - (peak.midi - minMidi) / (maxMidi - minMidi) * plotHeight;
-          const strength = clamp(peak.strength, 0, 1);
-          ctx.fillStyle = peak.midi < 60
-            ? `rgba(242,174,92,${.15 + strength * .8})`
-            : `rgba(91,220,197,${.15 + strength * .8})`;
-          ctx.fillRect(x, y - 1.5, cellWidth, 3 + strength * 2);
-        }
-      }
-    } else {
-      // Projects created before frame storage still get a full-song constellation from beat summaries.
-      for (const part of analysis.chordCandidates || []) {
-        const x = left + ((part.startMs + part.endMs) / 2) / duration * plotWidth;
-        const cellWidth = Math.max(1.5, (part.endMs - part.startMs) / duration * plotWidth);
-        for (const peak of part.spectralPeaks || []) {
-          if (peak.midi < minMidi || peak.midi > maxMidi) continue;
-          const y = bottom - (peak.midi - minMidi) / (maxMidi - minMidi) * plotHeight;
-          ctx.fillStyle = peak.midi < 60 ? 'rgba(242,174,92,.72)' : 'rgba(91,220,197,.72)';
-          ctx.fillRect(x - cellWidth / 2, y - 2, cellWidth, 4 + clamp(peak.strength, 0, 1) * 2);
-        }
-      }
+    const frames = analysis.spectralFrames || [];
+    const parts = analysis.chordCandidates || [];
+    const allAudioMidi = frames.flatMap((frame) => (frame.peaks || []).map((peak) => peak.midi))
+      .filter((midi) => Number.isFinite(midi));
+    const notesByFrame = [];
+    let partIndex = 0;
+    const historyFrames = frames.length ? frames : parts.map((part) => ({
+      timeMs: (part.startMs + part.endMs) / 2, peaks: part.spectralPeaks || [],
+    }));
+    for (const frame of historyFrames) {
+      while (partIndex + 1 < parts.length && frame.timeMs >= parts[partIndex].endMs) partIndex++;
+      const part = parts[partIndex];
+      const notes = getChordPitches(part, frame);
+      notesByFrame.push({ timeMs: frame.timeMs, notes });
+    }
+    const usedPitches = [...new Set(notesByFrame.flatMap((frame) => frame.notes.map((note) => note.midi)))];
+    const minMidi = allAudioMidi.length ? Math.min(...allAudioMidi) : (usedPitches.length ? Math.min(...usedPitches) : 36);
+    const maxMidi = allAudioMidi.length ? Math.max(...allAudioMidi) : (usedPitches.length ? Math.max(...usedPitches) : minMidi + 12);
+    const pitchRange = Math.max(12, maxMidi - minMidi);
+    const yFor = (midi) => bottom - (midi - minMidi) / pitchRange * plotHeight;
+    ctx.font = '8px system-ui,sans-serif'; ctx.textAlign = 'right';
+    for (const midi of usedPitches) {
+      const y = yFor(midi);
+      ctx.strokeStyle = 'rgba(197,221,195,.13)'; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(197,221,195,.42)'; ctx.beginPath(); ctx.moveTo(left - 5, y); ctx.lineTo(left, y); ctx.stroke();
+    }
+    let lastLabelY = -Infinity;
+    for (const midi of usedPitches.sort((a, b) => b - a)) {
+      const y = yFor(midi);
+      if (y - lastLabelY < 10) continue;
+      ctx.fillStyle = '#c4d2c4';
+      ctx.fillText(`${NOTES[midi % 12]}${Math.floor(midi / 12) - 1}`, left - 7, y + 3);
+      lastLabelY = y;
+    }
+    const voiceColors = ['#f2a45d', '#56d9c4', '#e583bd'];
+    for (let voice = 0; voice < 3; voice++) {
+      ctx.beginPath(); let drawing = false;
+      notesByFrame.forEach(({ timeMs, notes }) => {
+        const note = notes[voice];
+        if (!note) { drawing = false; return; }
+        const x = left + clamp(timeMs / duration, 0, 1) * plotWidth;
+        const y = yFor(note.midi);
+        if (!drawing) { ctx.moveTo(x, y); drawing = true; } else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = voiceColors[voice]; ctx.lineWidth = 2; ctx.globalAlpha = .9; ctx.stroke(); ctx.globalAlpha = 1;
     }
     const active = currentSegment;
     if (active) {
@@ -216,9 +257,13 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     }
     const cursorX = left + clamp(currentPositionMs / duration, 0, 1) * plotWidth;
     ctx.strokeStyle = '#ff986b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cursorX, top); ctx.lineTo(cursorX, bottom); ctx.stroke();
-    ctx.fillStyle = '#a7b9ab'; ctx.textAlign = 'left'; ctx.fillText('0:00', left, height - 6);
+    ctx.fillStyle = '#a7b9ab'; ctx.textAlign = 'left'; ctx.fillText(`0 · ${peakName({ midi: minMidi })}`, left, height - 6);
     const endSeconds = duration / 1000;
     ctx.textAlign = 'right'; ctx.fillText(`${Math.floor(endSeconds / 60)}:${String(Math.floor(endSeconds % 60)).padStart(2, '0')}`, right, height - 6);
+    const currentPitches = getChordPitches(currentSegment, getCurrentFrame(analysis, currentPositionMs, currentSegment));
+    historyLegend.replaceChildren();
+    currentPitches.slice(0, 3).forEach((pitch, index) => historyLegend.append(makeNode('span', `harmonic-voice-chip voice-${index}`, peakName(pitch))));
+    if (!currentPitches.length) historyLegend.append(makeNode('span', 'harmonic-history-empty', 'Sin acorde definido para este tramo'));
   }
 
   function update(nextSegment = currentSegment, positionMs = currentPositionMs, nextLiveFrame = liveFrame) {
@@ -243,12 +288,12 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
       const item = makeNode('span', `harmonic-register-chip ${key}`, `${label}: ${strongest.join(' · ') || 'sin picos'}`);
       constellation.append(item);
     }
-    drawSpectrogram();
+    drawHarmonicHistory();
   }
 
   update(segment, playbackPositionMs, null);
-  resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { lastCanvasDraw = 0; drawSpectrogram(); }) : null;
-  resizeObserver?.observe(root);
-  requestAnimationFrame(() => { lastCanvasDraw = 0; drawSpectrogram(); });
-  return { element: root, update, dispose: () => resizeObserver?.disconnect() };
+  resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(() => { lastHistoryDraw = 0; drawHarmonicHistory(); }) : null;
+  resizeObserver?.observe(root); resizeObserver?.observe(historyElement);
+  requestAnimationFrame(() => { lastHistoryDraw = 0; drawHarmonicHistory(); });
+  return { element: root, historyElement, historyCanvas, update, dispose: () => resizeObserver?.disconnect() };
 }

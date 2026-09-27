@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v16-empty-spectrum-fix';
+const SHELL_CACHE = 'stageprompter-shell-v20-pitch-visualizer-cleanup';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [

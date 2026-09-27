@@ -203,3 +203,21 @@
 .harmonic-register-chip{padding:.2rem .3rem;border-radius:5px;background:#19251e;color:#d8e6da;font-size:.59rem}
 .harmonic-register-chip.bass{color:#f0bb74}.harmonic-register-chip.high{color:#78dfd0}
 @media(max-width:360px){.harmonic-dashboard{grid-template-columns:1fr}.harmonic-wheel-wrap{width:min(100%,290px)}.harmonic-spectrum-column{order:2}}
+
+/* Pitch-path history sits with the audio transport; magenta markers show FFT peaks on the guitar. */
+.lab-transport{grid-template-rows:58px auto auto;align-items:center}
+.lab-transport .harmonic-history-host{grid-column:1/-1;grid-row:2;min-width:0;width:100%;margin:0;padding:.28rem .5rem;border-top:1px solid #33473b;background:#0b1410}
+.lab-transport-status{grid-column:2;grid-row:3}
+.harmonic-history-dock{min-width:0;width:100%}
+.harmonic-history-heading{display:flex;align-items:center;justify-content:space-between;gap:.4rem;min-height:20px}
+.harmonic-history-heading h4{margin:0;color:#e8f0df;font-size:.7rem;font-weight:700;line-height:1.2}
+.harmonic-history-legend{display:flex;justify-content:flex-end;gap:.25rem;flex-wrap:wrap}
+.harmonic-voice-chip{padding:.08rem .28rem;border-radius:4px;background:#15221a;color:#dce9df;font:600 .59rem ui-monospace,Consolas,monospace}
+.harmonic-voice-chip.voice-0{border-left:2px solid #f2a45d}.harmonic-voice-chip.voice-1{border-left:2px solid #56d9c4}.harmonic-voice-chip.voice-2{border-left:2px solid #e583bd}
+.harmonic-history-empty{color:#aebdaf;font-size:.6rem}
+.harmonic-history-canvas{display:block;width:100%;height:124px;border:1px solid #2c4134;border-radius:5px;background:#08110d;cursor:crosshair}
+.analysis-spectral-legend{margin:.22rem 0 .35rem;color:#f58bdd;font-size:.63rem;line-height:1.25}
+.analysis-spectral-legend[hidden]{display:none}
+.fretboard-spectral-pitch{pointer-events:help}
+.lab-transport .harmonic-history-host .harmonic-history-heading{max-height:22px;overflow:hidden}
+@media(max-width:620px){.lab-transport{grid-template-columns:1fr;grid-template-rows:58px auto auto auto}.lab-transport .analysis-waveform{grid-column:1;grid-row:1}.lab-transport .audio-study-player{grid-column:1;grid-row:2}.lab-transport .harmonic-history-host{grid-column:1;grid-row:3}.lab-transport-status{grid-column:1;grid-row:4}.harmonic-history-heading h4{font-size:.65rem}.harmonic-history-canvas{height:110px}}

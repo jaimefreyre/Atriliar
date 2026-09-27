@@ -55,7 +55,7 @@ function getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, chordPitch
   return null;
 }
 
-export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined) {
+export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined, spectralPitches = []) {
   const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr, bassOverride);
   const stringNames = ['E', 'A', 'D', 'G', 'B', 'E']; // 6ta a 1ra
   const frets = 22;
@@ -120,6 +120,24 @@ export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, ba
     svg += `<text x="${x}" y="${y + 3}" fill="${style.text}" font-size="${style.r > 7 ? 8 : 6}" font-weight="bold" text-anchor="middle" font-family="sans-serif">${note}</text>`;
     if (style.label) {
       svg += `<text x="${x}" y="${y - style.r - 3}" fill="${style.fill}" font-size="8" font-weight="bold" text-anchor="middle" font-family="sans-serif">${style.label}</text>`;
+    }
+  });
+  const strongestPitches = [...new Map((spectralPitches || [])
+    .filter((peak) => Number.isFinite(peak.midi) && peak.midi >= 40 && peak.midi <= 86)
+    .sort((a, b) => (b.strength || 0) - (a.strength || 0))
+    .map((peak) => [Math.round(peak.midi), peak])).values()].slice(0, 6);
+  strongestPitches.forEach((peak) => {
+    const midi = Math.round(peak.midi);
+    for (let s = 0; s < TUNING.length; s++) {
+      const fret = midi - TUNING[s];
+      if (fret < 0 || fret >= frets) continue;
+      const x = (fret + 0.5) * fretWidth;
+      const y = (s + 1) * stringGap;
+      const label = peak.note || `${pitchClassToSharpName(mod12(midi))}${Math.floor(midi / 12) - 1}`;
+      const strength = Math.max(0, Math.min(1, Number(peak.strength) || 0));
+      svg += `<g class="fretboard-spectral-pitch"><title>${label} · pico espectral · ${Math.round(strength * 100)}%</title>`;
+      svg += `<circle cx="${x}" cy="${y}" r="7" fill="#f15acb" stroke="#fff" stroke-width="1.5"/>`;
+      svg += `<text x="${x}" y="${y + 2.1}" fill="#180d18" font-size="5.6" font-weight="900" text-anchor="middle" font-family="sans-serif">${label}</text></g>`;
     }
   });
   svg += `</svg>`;

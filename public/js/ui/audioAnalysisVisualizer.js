@@ -23,6 +23,23 @@ function timeLabel(ms) {
   return `${minutes}:${seconds}`;
 }
 
+function spectralFrameAt(analysis, positionMs) {
+  const frames = analysis.spectralFrames || [];
+  if (!frames.length) return null;
+  let low = 0, high = frames.length - 1, best = 0;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if (frames[middle].timeMs <= positionMs) { best = middle; low = middle + 1; } else high = middle - 1;
+  }
+  return frames[best];
+}
+
+function spectralPeaksAt(analysis, segment, positionMs) {
+  const frame = spectralFrameAt(analysis, positionMs);
+  return frame && (!segment || frame.timeMs >= segment.startMs && frame.timeMs < segment.endMs)
+    ? frame.peaks || [] : segment?.spectralPeaks || [];
+}
+
 /** Interactive study surface for one Essentia analysis; nothing here mutates a saved song. */
 export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, onSelect = () => {}, getSection = () => null }) {
   const root = node('section', 'analysis-studio');
@@ -72,6 +89,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const instrumentPanel = node('section', 'analysis-instruments');
   instrumentPanel.setAttribute('aria-label', 'Instrumento para estudiar el tramo actual');
   root.append(instrumentPanel);
+  const harmonicHistoryHost = node('div', 'harmonic-history-host');
 
   let selectedIndex = 0;
   let activeChordSelect = null;
@@ -81,6 +99,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   let liveFrame = null;
   let scaleId = 'none';
   let activeInstrument = 'guitar';
+  let refreshSpectralOverlay = () => {};
+  let lastSpectralPitchSignature = '';
 
   function drawWaveform() {
     const rect = waveformCanvas.getBoundingClientRect();
@@ -220,6 +240,9 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   function renderDetail() {
     list.replaceChildren(); detail.replaceChildren();
+    harmonicHistoryHost.replaceChildren();
+    refreshSpectralOverlay = () => {};
+    lastSpectralPitchSignature = '';
     const segments = analysis.chordCandidates || [];
     segments.forEach((segment, index) => {
       const chosen = segment.selectedSymbol ? `✓ ${segment.selectedSymbol}` : (segment.symbol ? `¿${segment.symbol}?` : 'Sin acorde');
@@ -322,13 +345,22 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     setActiveScale(chordNotes.root || 'C', scaleId);
     const instrumentNav = node('div', 'analysis-instrument-switch');
     const drawing = node('div', 'analysis-instrument-drawing analysis-active-instrument');
+    const spectralLegend = node('p', 'analysis-spectral-legend', '◆ Picos FFT dominantes · intensidad relativa · estimación, no nota confirmada');
     const renderInstrument = () => {
       drawing.replaceChildren();
-      if (activeInstrument === 'guitar') renderFretboard(drawing, symbol);
-      else if (activeInstrument === 'bass') renderBassFretboard(drawing, symbol);
-      else if (activeInstrument === 'piano') renderPiano(drawing, symbol);
-      else if (section?.tab?.trim()) renderAsciiTab(drawing, { label: section.label, ascii: section.tab });
-      else drawing.append(node('p', 'analysis-empty', 'Esta sección todavía no tiene tablatura. Puedes escribirla en el editor de sección.'));
+      if (activeInstrument === 'guitar') {
+        const peaks = spectralPeaksAt(analysis, segment, playbackPositionMs)
+          .filter((peak) => Number.isFinite(peak.midi) && peak.midi >= 40 && peak.midi <= 86)
+          .sort((a, b) => (b.strength || 0) - (a.strength || 0)).slice(0, 6);
+        renderFretboard(drawing, symbol, undefined, undefined, peaks);
+        spectralLegend.hidden = peaks.length === 0;
+      } else {
+        spectralLegend.hidden = true;
+        if (activeInstrument === 'bass') renderBassFretboard(drawing, symbol);
+        else if (activeInstrument === 'piano') renderPiano(drawing, symbol);
+        else if (section?.tab?.trim()) renderAsciiTab(drawing, { label: section.label, ascii: section.tab });
+        else drawing.append(node('p', 'analysis-empty', 'Esta sección todavía no tiene tablatura. Puedes escribirla en el editor de sección.'));
+      }
     };
     [['guitar', 'Guitarra'], ['bass', 'Bajo'], ['piano', 'Piano'], ['tab', 'Tab']].forEach(([id, label]) => {
       const button = node('button', 'analysis-instrument-tab', label); button.type = 'button';
@@ -337,15 +369,26 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       instrumentNav.append(button);
     });
     harmonicVisualization = createHarmonicCircle({ analysis, segment, playbackPositionMs });
-    instrumentPanel.append(instrumentNav, drawing, harmonicVisualization.element);
+    harmonicHistoryHost.replaceChildren(harmonicVisualization.historyElement);
+    harmonicVisualization.historyCanvas.addEventListener('click', (event) => selectAtCanvas(event, harmonicVisualization.historyCanvas, 58, 70));
+    instrumentPanel.append(instrumentNav, drawing, spectralLegend, harmonicVisualization.element);
     renderInstrument();
+    refreshSpectralOverlay = () => {
+      if (activeInstrument !== 'guitar') return;
+      const current = analysis.chordCandidates.find((part) => playbackPositionMs >= part.startMs && playbackPositionMs < part.endMs) || segment;
+      const peaks = spectralPeaksAt(analysis, current, playbackPositionMs)
+        .filter((peak) => Number.isFinite(peak.midi) && peak.midi >= 40 && peak.midi <= 86)
+        .sort((a, b) => (b.strength || 0) - (a.strength || 0)).slice(0, 6);
+      const signature = peaks.map((peak) => `${Math.round(peak.midi)}:${Math.round((peak.strength || 0) * 100)}`).join('|');
+      if (signature !== lastSpectralPitchSignature) { lastSpectralPitchSignature = signature; renderInstrument(); }
+    };
   }
 
   mode.addEventListener('change', drawOverview);
   grouping.addEventListener('change', drawOverview);
-  function selectAtCanvas(event, target) {
+  function selectAtCanvas(event, target, leftInset = 48, totalInset = 60) {
     const rect = target.getBoundingClientRect();
-    const timeMs = Math.max(0, Math.min(analysis.durationMs - 1, ((event.clientX - rect.left - 48) / (rect.width - 60)) * analysis.durationMs));
+    const timeMs = Math.max(0, Math.min(analysis.durationMs - 1, ((event.clientX - rect.left - leftInset) / (rect.width - totalInset)) * analysis.durationMs));
     const index = analysis.chordCandidates.findIndex((segment) => timeMs >= segment.startMs && timeMs < segment.endMs);
     if (index >= 0) { selectedIndex = index; playbackPositionMs = analysis.chordCandidates[index].startMs; renderDetail(); onSelect(analysis.chordCandidates[index]); }
   }
@@ -361,6 +404,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     if (followSelection && index >= 0 && index !== selectedIndex) { selectedIndex = index; renderDetail(); }
     else {
       harmonicVisualization?.update(analysis.chordCandidates[index] || analysis.chordCandidates[selectedIndex], playbackPositionMs, liveFrame);
+      refreshSpectralOverlay();
       drawOverview();
     }
   }
@@ -381,8 +425,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     if (status) status.textContent = message;
   }
 
-  return { element: root, waveformCanvas, redraw: drawOverview, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
+  return { element: root, waveformCanvas, historyElement: harmonicHistoryHost, redraw: drawOverview, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
     setPlaybackPosition, setLiveFrame, setAuditionStatus, selectSegmentAt, refreshDetail: renderDetail,
-    dispose: () => resizeObserver?.disconnect(),
+    dispose: () => { resizeObserver?.disconnect(); harmonicVisualization?.dispose(); harmonicHistoryHost.replaceChildren(); },
     getSelectedSegment: () => analysis.chordCandidates[selectedIndex] || null };
 }
