@@ -5,6 +5,10 @@ import { getSongV2 } from '../data/indexedDb.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
 import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
+import { createMicCapture } from '../audio/micCapture.js';
+import { matchChordTemplate } from '../audio/chordTemplateMatch.js';
+import { compareChroma } from '../audio/chromaSimilarity.js';
+import { scoreChordChroma } from '../music/chromaMatch.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -34,6 +38,16 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   let worker = null;
   let mediaUrl = null;
   let mediaPlayer = null;
+  let liveCapture = null;
+  let liveView = null;
+  let liveScores = [];
+  let lastLiveSegmentStartMs = null;
+  let smoothedLiveChroma = [];
+  let lastPlayheadDrawAt = 0;
+  let lastSignalDisplayAt = 0;
+  let liveInputQuality = 'low';
+  let playheadFrame = null;
+  let playheadMediaPlayer = null;
   let busy = false;
   const title = el('input', { id: 'audio-draft-title', type: 'text', maxlength: 200, placeholder: 'Título de la canción' });
   const artist = el('input', { id: 'audio-draft-artist', type: 'text', maxlength: 200, placeholder: 'Artista (opcional)' });
@@ -44,6 +58,18 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   const preview = el('pre', { className: 'audio-draft-preview' }, 'Sin análisis todavía.');
   const mediaPreview = el('div', { className: 'audio-study-player' });
   const analysisPanel = el('div', { id: 'audio-analysis-panel' });
+  const livePanel = el('section', { className: 'audio-live-panel', hidden: 'hidden', 'aria-label': 'Karaoke de análisis en vivo' });
+  const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
+  const liveReference = el('strong', { className: 'audio-live-reference' }, 'Referencia: —');
+  const liveTransition = el('strong', { className: 'audio-live-transition' }, 'Secuencia: —');
+  const liveGuess = el('strong', { className: 'audio-live-guess' }, 'Escucha: —');
+  const liveSimilarity = el('strong', { className: 'audio-live-similarity' }, 'Afinidad armónica: —');
+  const liveCompatibility = el('p', { className: 'audio-live-compatibility' }, 'Compatibilidad con el acorde elegido: —');
+  const liveStart = el('button', { type: 'button', className: 'btn-primary' }, 'Iniciar escucha por micrófono');
+  const liveStop = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Apagar micrófono');
+  const liveMetrics = el('div', { className: 'audio-live-metrics' });
+  liveMetrics.append(liveReference, liveTransition, liveGuess, liveSimilarity);
+  const liveActions = el('footer', { className: 'audio-draft-actions' }); liveActions.append(liveStart, liveStop);
   const analyze = el('button', { type: 'button', className: 'btn-primary' }, 'Analizar archivo');
   const create = el('button', { type: 'button', className: 'btn-primary', disabled: 'true' }, 'Crear borrador y calibrar');
   const closeButton = el('button', { type: 'button', className: 'btn-secondary' }, 'Cerrar');
@@ -57,12 +83,18 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   const storeLabel = el('label', { for: 'audio-draft-store-audio', className: 'audio-draft-check' }, 'Guardar el archivo en el dispositivo junto con el borrador'); storeLabel.prepend(storeAudio);
   form.append(fileLabel, titleLabel, artistLabel, bpmLabel, storeLabel);
   const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, create, closeButton);
+  livePanel.append(el('h3', {}, 'Karaoke de análisis en vivo'),
+    el('p', { className: 'audio-live-note' }, 'Inicia el micrófono y reproduce la pista para comparar la entrada con el tramo actual. Usa auriculares para que la pista no se filtre al micrófono. Se analiza localmente; el porcentaje compara perfiles de croma y no es una nota de ejecución. Si cantas una sola nota, puede faltar información para confirmar el acorde completo.'),
+    liveStatus, liveMetrics, liveCompatibility, liveActions);
   dialog.append(heading,
     el('p', { className: 'audio-draft-note' }, 'El análisis estima tempo y armonía, pero puede equivocarse. Revisa el espectro, compara alternativas, escucha cada tramo y asigna tú el acorde antes de crear el borrador.'),
-    form, mediaPreview, status, preview, analysisPanel, actions);
+    form, mediaPreview, status, preview, analysisPanel, livePanel, actions);
   document.body.append(dialog);
 
   function cleanUp() {
+    if (playheadFrame !== null) cancelAnimationFrame(playheadFrame);
+    liveCapture?.dispose(); liveCapture = null;
+    mediaPlayer?.pause(); mediaPlayer = null;
     worker?.terminate(); worker = null;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     if (dialog.open) dialog.close();
@@ -74,7 +106,73 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     status.textContent = error?.message || 'No se pudo completar el análisis.';
     busy = false; analyze.disabled = false; create.disabled = true;
   }
+  function playbackPositionMs() { return Math.max(0, (mediaPlayer?.currentTime || 0) * 1000); }
+  function currentSegment() {
+    return segmentAt(playbackPositionMs());
+  }
+  function segmentAt(position) {
+    return analysis?.chordCandidates.find((segment) => position >= segment.startMs && position < segment.endMs)
+      || analysis?.chordCandidates.at(-1) || null;
+  }
+  function updateLiveReference() {
+    const segment = currentSegment();
+    if (!segment) return;
+    const referenceSymbol = segment.selectedSymbol || segment.symbol;
+    liveReference.textContent = segment.selectedSymbol
+      ? `Referencia elegida: ${segment.selectedSymbol}`
+      : `Referencia automática (sin confirmar): ${segment.symbol || 'sin acorde claro'}`;
+    const currentIndex = analysis.chordCandidates.indexOf(segment);
+    const previous = currentIndex > 0 ? analysis.chordCandidates[currentIndex - 1] : null;
+    const previousSymbol = previous?.selectedSymbol || previous?.symbol;
+    liveTransition.textContent = previousSymbol && referenceSymbol
+      ? `Secuencia de referencia: ${previousSymbol} → ${referenceSymbol}${previous?.selectedSymbol && segment.selectedSymbol ? ' · elegida' : ' · propuesta'}`
+      : 'Secuencia: sin acorde anterior para comparar';
+    if (liveScores.length && liveScores.at(-1).frame) {
+      const frame = liveScores.at(-1).frame;
+      const guess = matchChordTemplate(smoothedLiveChroma.length ? smoothedLiveChroma : frame.chroma, { minScore: 0.5, minMargin: 0.03 });
+      const matches = guess.symbol === referenceSymbol;
+      liveGuess.textContent = `Escucha estimada: ${guess.symbol} · ajuste ${guess.score.toFixed(2)}${matches ? ' · coincide con el tramo' : ''}`;
+      if (referenceSymbol && segment.chroma) {
+        const recentScores = liveScores.filter((item) => Date.now() - item.at < 2500 && item.affinity !== null)
+          .map((item) => item.affinity);
+        const mean = recentScores.length ? recentScores.reduce((sum, value) => sum + value, 0) / recentScores.length : null;
+        const middle = Math.floor(recentScores.length / 2);
+        const firstHalf = recentScores.slice(0, middle); const secondHalf = recentScores.slice(middle);
+        const average = (values) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+        const delta = average(secondHalf) - average(firstHalf);
+        const trend = Number.isFinite(delta) && recentScores.length >= 4
+          ? delta > 0.025 ? ` · mejorando ↑ ${Math.round(delta * 100)} pp` : delta < -0.025 ? ` · alejándose ↓ ${Math.round(Math.abs(delta) * 100)} pp` : ' · estable'
+          : '';
+        liveSimilarity.textContent = mean === null ? 'Afinidad armónica: esperando señal' : `Afinidad armónica: ${Math.round(mean * 100)}%${trend}`;
+      }
+      if (segment.selectedSymbol) {
+        const fit = scoreChordChroma(frame.chroma, segment.selectedSymbol);
+        liveCompatibility.textContent = fit.status === 'scored'
+          ? `Energía captada dentro de ${segment.selectedSymbol}: ${Math.round(fit.ratio * 100)}% (orientativo).`
+          : 'Compatibilidad con el acorde elegido: señal insuficiente.';
+      } else liveCompatibility.textContent = 'Elige un acorde para ver compatibilidad con su conjunto de notas.';
+    }
+  }
+  function updatePlayhead() {
+    if (!mediaPlayer || !analysis) return;
+    const now = performance.now();
+    if (now - lastPlayheadDrawAt >= 75) {
+      lastPlayheadDrawAt = now;
+      liveView?.setPlaybackPosition(playbackPositionMs());
+    }
+    const segment = currentSegment();
+    if (segment && segment.startMs !== lastLiveSegmentStartMs) {
+      lastLiveSegmentStartMs = segment.startMs;
+      liveScores = [];
+      updateLiveReference();
+    }
+    if (!mediaPlayer.paused && !mediaPlayer.ended) playheadFrame = requestAnimationFrame(updatePlayhead);
+    else playheadFrame = null;
+  }
   file.addEventListener('change', () => {
+    liveCapture?.dispose(); liveCapture = null; liveStop.disabled = true; liveStart.disabled = false;
+    livePanel.hidden = true; liveView = null; liveScores = []; lastLiveSegmentStartMs = null;
+    mediaPlayer?.pause(); mediaPlayer = null; playheadMediaPlayer = null;
     selectedFile = file.files?.[0] || null; decoded = null; analysis = null; create.disabled = true;
     analysisPanel.replaceChildren(); mediaPreview.replaceChildren(); mediaPlayer = null;
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
@@ -113,10 +211,14 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
                 .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
               const unassigned = analysis.chordCandidates.length - analysis.chordSuggestions.length;
               preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
+              updateLiveReference();
             },
             onSelect: (segment) => { if (mediaPlayer) mediaPlayer.currentTime = segment.startMs / 1000; },
           });
           analysisPanel.replaceChildren(analysisView.element);
+          liveView = analysisView;
+          livePanel.hidden = false;
+          livePlayerEvents(true);
           bpm.value = Number.isFinite(data.bpm) && data.bpm >= 20 && data.bpm <= 300 ? data.bpm.toFixed(2) : '';
           const unassigned = data.chordCandidates.length - analysis.chordSuggestions.length;
           preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados inicialmente: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
@@ -128,6 +230,79 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
       worker.onerror = (event) => fail(new Error(event.message || 'Falló el Worker de audio.'));
       worker.postMessage({ type: 'init' });
     } catch (error) { fail(error); }
+  });
+  function livePlayerEvents(install = false) {
+    if (!mediaPlayer) return;
+    const callback = () => {
+      if (playheadFrame !== null) cancelAnimationFrame(playheadFrame);
+      playheadFrame = requestAnimationFrame(updatePlayhead);
+    };
+    if (install && playheadMediaPlayer !== mediaPlayer) {
+      playheadMediaPlayer = mediaPlayer;
+      ['play', 'pause', 'seeked', 'timeupdate', 'ended'].forEach((name) => mediaPlayer.addEventListener(name, callback));
+    }
+    callback();
+  }
+  liveStart.addEventListener('click', async () => {
+    if (!analysis || liveCapture) return;
+    liveStart.disabled = true;
+    liveStatus.textContent = 'Iniciando micrófono y analizador local…';
+    liveScores = [];
+    smoothedLiveChroma = [];
+    try {
+      liveCapture = createMicCapture({
+        onFrame: (frame) => {
+          liveInputQuality = frame.quality;
+          if (frame.quality !== 'ok' || performance.now() - lastSignalDisplayAt > 300) {
+            liveStatus.textContent = frame.quality === 'clipping'
+              ? 'Entrada saturada: baja la ganancia del micrófono.'
+              : frame.quality !== 'ok' ? 'Señal baja: acércate o aumenta la ganancia.'
+                : `Escuchando localmente · nivel ${Math.round(frame.peak * 100)}%.`;
+            lastSignalDisplayAt = performance.now();
+          }
+        },
+        onHarmony: (frame) => {
+          if (liveInputQuality !== 'ok') {
+            liveView?.setLiveFrame(null);
+            liveGuess.textContent = liveInputQuality === 'clipping' ? 'Escucha: señal saturada' : 'Escucha: esperando señal clara';
+            liveSimilarity.textContent = 'Afinidad armónica: pausada por nivel de señal';
+            return;
+          }
+          if (frame.observedPerfMs && mediaPlayer && !mediaPlayer.paused) {
+            const age = Math.max(0, performance.now() - frame.observedPerfMs);
+            frame.playbackPositionMs = Math.max(0, playbackPositionMs() - age);
+          }
+          const segment = segmentAt(Number.isFinite(frame.playbackPositionMs) ? frame.playbackPositionMs : playbackPositionMs());
+          frame.affinity = segment?.chroma ? compareChroma(segment.chroma, frame.chroma) : null;
+          smoothedLiveChroma = Array.from({ length: 12 }, (_, index) => {
+            const previous = smoothedLiveChroma[index] || 0;
+            return previous * 0.65 + frame.chroma[index] * 0.35;
+          });
+          liveScores.push({ at: Date.now(), affinity: frame.affinity, frame });
+          liveScores = liveScores.filter((item) => Date.now() - item.at < 5000).slice(-60);
+          liveView?.setLiveFrame(frame);
+          updateLiveReference();
+        },
+        onStatus: (state) => { if (state.message) liveStatus.textContent = state.message; },
+      });
+      await liveCapture.start();
+      liveStop.disabled = false;
+      liveStatus.textContent = 'Micrófono activo · la pista no se envía ni se graba.';
+    } catch (error) {
+      liveStatus.textContent = error?.message || 'No se pudo iniciar el análisis en vivo.';
+      await liveCapture?.dispose(); liveCapture = null; liveStart.disabled = false;
+    }
+  });
+  liveStop.addEventListener('click', async () => {
+    await liveCapture?.stop(); liveCapture = null;
+    liveStop.disabled = true; liveStart.disabled = false;
+    liveView?.setLiveFrame(null);
+    liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
+    liveTransition.textContent = 'Secuencia: —';
+    liveCompatibility.textContent = 'Compatibilidad con el acorde elegido: —';
+    smoothedLiveChroma = [];
+    liveStatus.textContent = 'Micrófono apagado';
+    liveInputQuality = 'low';
   });
   create.addEventListener('click', async () => {
     if (!analysis || busy) return;

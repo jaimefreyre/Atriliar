@@ -32,6 +32,15 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   modeLabel.append(mode);
   root.append(modeLabel);
 
+  const groupingLabel = node('label', 'analysis-grid-label', 'Agrupar pulsos por compás ');
+  const grouping = node('select', 'analysis-grid-grouping');
+  for (let count = 2; count <= 12; count++) {
+    const option = node('option', '', `${count} pulsos`); option.value = String(count); grouping.append(option);
+  }
+  grouping.value = '4';
+  groupingLabel.append(grouping); root.append(groupingLabel);
+  root.append(node('p', 'analysis-grid-note', 'Las líneas finas son pulsos detectados; las gruesas marcan el inicio de cada compás según la agrupación elegida. Ajusta esa agrupación si el pulso estimado no coincide con el compás musical.'));
+
   const canvas = node('canvas', 'analysis-overview');
   canvas.setAttribute('aria-label', 'Vista completa del análisis. También puedes elegir cada tramo en la lista inferior.');
   root.append(canvas);
@@ -48,6 +57,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   let selectedIndex = 0;
   let activeChordSelect = null;
+  let playbackPositionMs = 0;
+  let liveFrame = null;
 
   function drawOverview() {
     const rect = canvas.getBoundingClientRect();
@@ -84,11 +95,8 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     } else {
       const isBass = mode.value === 'bass';
       const peaks = segments.flatMap((segment) => isBass ? (segment.bassPeaks || []) : (segment.highPeaks || []));
-      const notes = peaks.map((item) => item.midi);
-      let minMidi = notes.length ? Math.min(...notes) : (isBass ? 28 : 60);
-      let maxMidi = notes.length ? Math.max(...notes) : (isBass ? 59 : 88);
-      if (maxMidi === minMidi) maxMidi++;
-      minMidi = Math.max(isBass ? 24 : 60, minMidi - 1); maxMidi = Math.min(isBass ? 60 : 96, maxMidi + 1);
+      const minMidi = isBass ? 24 : 60;
+      const maxMidi = isBass ? 60 : 96;
       ctx.strokeStyle = '#34443b'; ctx.lineWidth = 1;
       for (let midi = Math.ceil(minMidi / 12) * 12; midi <= maxMidi; midi += 12) {
         const y = top + plotHeight - ((midi - minMidi) / (maxMidi - minMidi)) * plotHeight;
@@ -107,6 +115,48 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
         });
       });
     }
+    const beatTimes = analysis.beats?.length ? analysis.beats.map((seconds) => seconds * 1000)
+      : (Number.isFinite(analysis.bpm) && analysis.bpm > 0
+        ? Array.from({ length: Math.ceil(endMs / (60_000 / analysis.bpm)) }, (_, index) => index * 60_000 / analysis.bpm)
+        : []);
+    const beatsPerBar = Number(grouping.value);
+    beatTimes.forEach((timeMs, index) => {
+      if (timeMs < 0 || timeMs > endMs) return;
+      const x = left + (timeMs / endMs) * plotWidth;
+      const isBar = index % beatsPerBar === 0;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + plotHeight);
+      ctx.strokeStyle = isBar ? 'rgba(243, 185, 83, 0.72)' : 'rgba(190, 202, 193, 0.25)';
+      ctx.lineWidth = isBar ? 2 : 1; ctx.stroke();
+      if (isBar) {
+        ctx.fillStyle = '#f3b953'; ctx.font = '10px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(`c${Math.floor(index / beatsPerBar) + 1}`, x + 2, top + 11);
+      }
+    });
+    if (liveFrame) {
+      const x = left + (Math.max(0, Math.min(endMs, playbackPositionMs)) / endMs) * plotWidth;
+      const livePeaks = mode.value === 'bass' ? liveFrame.bassPeaks : mode.value === 'melody' ? liveFrame.highPeaks : [];
+      if (mode.value === 'chroma') {
+        const rowHeight = plotHeight / 12;
+        liveFrame.chroma?.forEach((energy, pitch) => {
+          if (energy < 0.12) return;
+          const y = top + pitch * rowHeight + rowHeight / 2;
+          ctx.beginPath(); ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y);
+          ctx.strokeStyle = '#ff9955'; ctx.lineWidth = Math.min(4, 1 + energy * 3); ctx.stroke();
+        });
+      } else {
+        const minMidi = mode.value === 'bass' ? 24 : 60;
+        const maxMidi = mode.value === 'bass' ? 60 : 96;
+        livePeaks?.forEach((peak) => {
+          if (peak.midi < minMidi || peak.midi > maxMidi) return;
+          const y = top + plotHeight - ((peak.midi - minMidi) / (maxMidi - minMidi)) * plotHeight;
+          ctx.beginPath(); ctx.arc(x, y, 4 + 3 * (peak.strength || 0), 0, Math.PI * 2);
+          ctx.strokeStyle = '#ff9955'; ctx.lineWidth = 2; ctx.stroke();
+        });
+      }
+    }
+    const playX = left + (Math.max(0, Math.min(endMs, playbackPositionMs)) / endMs) * plotWidth;
+    ctx.beginPath(); ctx.moveTo(playX, top); ctx.lineTo(playX, top + plotHeight);
+    ctx.strokeStyle = '#f2f66f'; ctx.lineWidth = 2; ctx.stroke();
     ctx.fillStyle = '#aebbb1'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.fillText('0:00', left, height - 10);
     ctx.textAlign = 'right'; ctx.fillText(timeLabel(endMs), width - 12, height - 10);
   }
@@ -183,6 +233,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   }
 
   mode.addEventListener('change', drawOverview);
+  grouping.addEventListener('change', drawOverview);
   canvas.addEventListener('click', (event) => {
     const rect = canvas.getBoundingClientRect();
     const timeMs = Math.max(0, Math.min(analysis.durationMs, ((event.clientX - rect.left - 48) / (rect.width - 60)) * analysis.durationMs));
@@ -190,5 +241,15 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     if (index >= 0) { selectedIndex = index; renderDetail(); onSelect(analysis.chordCandidates[index]); }
   });
   renderDetail();
-  return { element: root, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus() };
+  function setPlaybackPosition(positionMs) {
+    playbackPositionMs = Number.isFinite(positionMs) ? positionMs : 0;
+    const index = analysis.chordCandidates.findIndex((segment) => playbackPositionMs >= segment.startMs && playbackPositionMs < segment.endMs);
+    if (index >= 0 && index !== selectedIndex) { selectedIndex = index; renderDetail(); }
+    else drawOverview();
+  }
+
+  function setLiveFrame(frame) { liveFrame = frame; drawOverview(); }
+
+  return { element: root, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
+    setPlaybackPosition, setLiveFrame };
 }

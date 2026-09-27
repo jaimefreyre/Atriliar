@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v4';
+const SHELL_CACHE = 'stageprompter-shell-v7';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
@@ -15,8 +15,9 @@ const SHELL = [
   '/js/ui/audioDraftAssistant.js', '/js/ui/calibrationEditor.js', '/js/ui/dom.js', '/js/ui/importDialog.js',
   '/js/ui/audioAnalysisVisualizer.js', '/js/ui/performanceEvaluator.js', '/js/ui/playerView.js', '/js/ui/videoSection.js',
   '/js/audio/chordTemplateMatch.js', '/js/audio/decodeLocalFile.js', '/js/audio/draftBuilder.js',
-  '/js/audio/essentiaAnalysisWorker.js', '/js/audio/micCapture.js', '/js/audio/onsetMatcher.js',
-  '/js/audio/onsetWorker.js', '/js/audio/segmentation.js', '/fixtures/songs/all-verses.json',
+  '/js/audio/essentiaAnalysisWorker.js', '/js/audio/liveHarmonyWorker.js', '/js/audio/chromaSimilarity.js',
+  '/js/audio/micCapture.js', '/js/audio/audio-worklet-processor.js', '/js/audio/onsetMatcher.js', '/js/audio/onsetWorker.js',
+  '/js/audio/segmentation.js', '/fixtures/songs/all-verses.json',
 ];
 const OPTIONAL_TOOLS = ['/vendor/essentia/essentia.js-core.es.js', '/vendor/essentia/essentia-wasm.es.js'];
 

@@ -3,7 +3,7 @@
  * stream is never connected audibly to the output and stop/dispose closes its
  * tracks on every exit path.
  */
-export function createMicCapture({ audioContext = null, onFrame = () => {}, onStatus = () => {} } = {}) {
+export function createMicCapture({ audioContext = null, onFrame = () => {}, onHarmony = null, onStatus = () => {} } = {}) {
   let context = audioContext;
   let ownsContext = !audioContext;
   let stream = null;
@@ -11,6 +11,7 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onSt
   let worklet = null;
   let muteNode = null;
   let worker = null;
+  let harmonyWorker = null;
   let disposed = false;
 
   async function start() {
@@ -18,9 +19,14 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onSt
     if (stream) return;
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Este navegador no permite acceder al micrófono en este origen.');
     onStatus({ state: 'requesting', message: 'Esperando permiso del micrófono…' });
-    stream = await navigator.mediaDevices.getUserMedia({
+    const acquiredStream = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false,
     });
+    if (disposed) {
+      acquiredStream.getTracks().forEach((track) => track.stop());
+      throw new Error('La captura se cerró antes de obtener el permiso del micrófono.');
+    }
+    stream = acquiredStream;
     try {
       context ||= new (window.AudioContext || window.webkitAudioContext)();
       if (context.state === 'suspended') await context.resume();
@@ -33,6 +39,22 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onSt
         onFrame(data);
       };
       worker.onerror = (event) => onStatus({ state: 'error', message: event.message || 'Falló el analizador de señal.' });
+      if (onHarmony) {
+        harmonyWorker = new Worker(new URL('./liveHarmonyWorker.js', import.meta.url), { type: 'module' });
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('El análisis armónico en vivo tardó demasiado en iniciar.')), 15000);
+          harmonyWorker.onmessage = ({ data }) => {
+            if (data.type === 'ready') { clearTimeout(timeout); resolve(); return; }
+            if (data.type === 'error') { clearTimeout(timeout); reject(new Error(data.message)); return; }
+            if (data.type === 'harmony') {
+              const captureAgeMs = Math.max(0, context.currentTime * 1000 - data.timestampMs);
+              onHarmony({ ...data, observedPerfMs: performance.now() - captureAgeMs });
+            }
+          };
+          harmonyWorker.onerror = (event) => { clearTimeout(timeout); reject(new Error(event.message || 'Falló el análisis armónico.')); };
+          harmonyWorker.postMessage({ type: 'init' });
+        });
+      }
       source = context.createMediaStreamSource(stream);
       worklet = new AudioWorkletNode(context, 'stage-mic-frame-processor', {
         numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1], processorOptions: { frameMs: 20 },
@@ -42,7 +64,14 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onSt
       source.connect(worklet);
       worklet.connect(muteNode);
       muteNode.connect(context.destination);
-      worklet.port.onmessage = ({ data }) => { if (worker && data.type === 'frame') worker.postMessage(data, [data.samples.buffer]); };
+      worklet.port.onmessage = ({ data }) => {
+        if (!worker || data.type !== 'frame') return;
+        if (harmonyWorker) {
+          const samples = data.samples.slice();
+          harmonyWorker.postMessage({ ...data, samples }, [samples.buffer]);
+        }
+        worker.postMessage(data, [data.samples.buffer]);
+      };
       onStatus({ state: 'running', message: 'Micrófono activo. La señal se procesa localmente.' });
     } catch (error) {
       await stop();
@@ -55,6 +84,7 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onSt
     source?.disconnect(); source = null;
     muteNode?.disconnect(); muteNode = null;
     worker?.terminate(); worker = null;
+    harmonyWorker?.terminate(); harmonyWorker = null;
     stream?.getTracks().forEach((track) => track.stop()); stream = null;
     if (ownsContext && context) { await context.close().catch(() => {}); context = null; }
     if (!disposed) onStatus({ state: 'stopped', message: 'Micrófono desconectado.' });
