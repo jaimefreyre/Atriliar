@@ -9,6 +9,7 @@ import { createMicCapture } from '../audio/micCapture.js';
 import { matchChordTemplate } from '../audio/chordTemplateMatch.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
 import { scoreChordChroma } from '../music/chromaMatch.js';
+import { getAuditionRange } from '../audio/auditionRange.js';
 
 const ANALYSIS_WORKER_URL = new URL('../audio/essentiaAnalysisWorker.js', import.meta.url);
 
@@ -48,6 +49,7 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   let liveInputQuality = 'low';
   let playheadFrame = null;
   let playheadMediaPlayer = null;
+  let auditionEndMs = null;
   let busy = false;
   const title = el('input', { id: 'audio-draft-title', type: 'text', maxlength: 200, placeholder: 'Título de la canción' });
   const artist = el('input', { id: 'audio-draft-artist', type: 'text', maxlength: 200, placeholder: 'Artista (opcional)' });
@@ -107,6 +109,21 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     busy = false; analyze.disabled = false; create.disabled = true;
   }
   function playbackPositionMs() { return Math.max(0, (mediaPlayer?.currentTime || 0) * 1000); }
+  function playAnalysisSegment(segment) {
+    if (!mediaPlayer || !analysis || !segment) return;
+    const index = analysis.chordCandidates.indexOf(segment);
+    const range = getAuditionRange(analysis.chordCandidates, index);
+    if (!range) return;
+    auditionEndMs = range.endMs;
+    mediaPlayer.currentTime = range.startMs / 1000;
+    liveView?.setAuditionStatus(`Reproduciendo ${range.symbol ? `${range.symbol} · ` : ''}${(range.endMs - range.startMs) / 1000 < 1 ? 'tramo' : 'pasaje'} seleccionado.`);
+    const playback = mediaPlayer.play();
+    if (playback?.catch) playback.catch(() => {
+      auditionEndMs = null;
+      liveView?.setAuditionStatus('No se pudo reproducir. Pulsa reproducir en el control de audio e inténtalo de nuevo.');
+    });
+    livePlayerEvents();
+  }
   function currentSegment() {
     return segmentAt(playbackPositionMs());
   }
@@ -155,6 +172,16 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
   }
   function updatePlayhead() {
     if (!mediaPlayer || !analysis) return;
+    if (auditionEndMs !== null && playbackPositionMs() >= auditionEndMs) {
+      const endMs = auditionEndMs;
+      auditionEndMs = null;
+      mediaPlayer.pause();
+      mediaPlayer.currentTime = endMs / 1000;
+      liveView?.setPlaybackPosition(endMs);
+      liveView?.setAuditionStatus('Fin del pasaje. Pulsa “Escuchar tramo seleccionado” para repetirlo.');
+      playheadFrame = null;
+      return;
+    }
     const now = performance.now();
     if (now - lastPlayheadDrawAt >= 75) {
       lastPlayheadDrawAt = now;
@@ -213,7 +240,7 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
               preview.textContent = `${selectedFile.name}\nDuración: ${(data.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(data.bpm) ? data.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${data.beats.length}\nTramos estudiables: ${data.chordCandidates.length}\nAcordes asignados: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}\nLa puntuación del reconocedor es una similitud interna, no una probabilidad.`;
               updateLiveReference();
             },
-            onSelect: (segment) => { if (mediaPlayer) mediaPlayer.currentTime = segment.startMs / 1000; },
+            onSelect: playAnalysisSegment,
           });
           analysisPanel.replaceChildren(analysisView.element);
           liveView = analysisView;
@@ -239,7 +266,17 @@ export function openAudioDraftAssistant({ onClose = () => {} } = {}) {
     };
     if (install && playheadMediaPlayer !== mediaPlayer) {
       playheadMediaPlayer = mediaPlayer;
-      ['play', 'pause', 'seeked', 'timeupdate', 'ended'].forEach((name) => mediaPlayer.addEventListener(name, callback));
+      ['play', 'pause', 'seeked', 'timeupdate', 'ended'].forEach((name) => mediaPlayer.addEventListener(name, (event) => {
+        if (event.type === 'pause' && auditionEndMs !== null && playbackPositionMs() < auditionEndMs) {
+          auditionEndMs = null;
+          liveView?.setAuditionStatus('Escucha detenida. Pulsa “Escuchar tramo seleccionado” para volver a oírlo.');
+        }
+        if (event.type === 'ended' && auditionEndMs !== null) {
+          auditionEndMs = null;
+          liveView?.setAuditionStatus('Fin del audio. Selecciona otro tramo o vuelve al inicio para escucharlo.');
+        }
+        callback();
+      }));
     }
     callback();
   }

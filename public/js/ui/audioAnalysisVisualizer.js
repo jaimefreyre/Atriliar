@@ -58,6 +58,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   let selectedIndex = 0;
   let activeChordSelect = null;
   let playbackPositionMs = 0;
+  let auditionStatus = 'Haz clic en un tramo del mapa o de la lista para escucharlo.';
   let liveFrame = null;
 
   function drawOverview() {
@@ -182,6 +183,13 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       : 'Sin propuesta automática clara para este tramo.';
     detail.append(node('p', 'analysis-suggestion', suggestion));
     const controls = node('div', 'analysis-chord-controls');
+    const listen = node('button', 'analysis-listen-button', '▶ Escuchar tramo seleccionado');
+    listen.type = 'button';
+    listen.addEventListener('click', () => onSelect(segment));
+    const listenStatus = node('p', 'analysis-listen-status', auditionStatus);
+    listenStatus.setAttribute('role', 'status');
+    listenStatus.setAttribute('aria-live', 'polite');
+    controls.append(listen, listenStatus);
     const label = node('label', '', 'Acorde para estudiar / usar en el borrador ');
     const chordSelect = node('select', 'analysis-chord-select');
     chordSelect.add(new Option('— Dejar sin asignar —', ''));
@@ -249,7 +257,12 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   }
 
   function setLiveFrame(frame) { liveFrame = frame; drawOverview(); }
+  function setAuditionStatus(message) {
+    auditionStatus = message;
+    const status = detail.querySelector('.analysis-listen-status');
+    if (status) status.textContent = message;
+  }
 
   return { element: root, getSelectedSegments: () => analysis.chordCandidates, focusChordSelect: () => activeChordSelect?.focus(),
-    setPlaybackPosition, setLiveFrame };
+    setPlaybackPosition, setLiveFrame, setAuditionStatus };
 }
