@@ -45,7 +45,7 @@ export function createLiveHarmonicRadar() {
   const chord = makeNode('strong', '', '—');
   const tones = makeNode('span', '', 'Esperando audio'); hub.append(chord, tones);
   wrap.append(hub); element.append(wrap);
-  function update(chroma = [], symbol = '') {
+  function update(chroma = [], symbol = '', status = '') {
     radar.replaceChildren(); ring.replaceChildren(); notes.replaceChildren();
     const center = 110, radius = 67;
     for (const level of [.25, .5, .75, 1]) {
@@ -70,7 +70,9 @@ export function createLiveHarmonicRadar() {
       label.textContent = NOTES[pc]; ring.append(label);
     });
     chord.textContent = symbol || '—';
-    tones.textContent = chordData.recognized ? chordData.tones.map(pitchClassToSharpName).join(' · ') : 'Acorde por determinar';
+    tones.textContent = chordData.recognized
+      ? `${status ? `${status} · ` : ''}${chordData.tones.map(pitchClassToSharpName).join(' · ')}`
+      : status || 'Acorde por determinar';
     element.dataset.hasSignal = String(values.some((value) => value > 0));
   }
   update();

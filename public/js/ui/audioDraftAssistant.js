@@ -7,6 +7,7 @@ import { cacheOptionalAudioTools } from '../data/offline.js';
 import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
 import { createMicCapture } from '../audio/micCapture.js';
 import { createLiveChordStabilizer } from '../audio/liveChordStabilizer.js';
+import { createLivePitchTracker } from '../audio/livePitchTracker.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
 import { scoreChordChroma } from '../music/chromaMatch.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
@@ -48,9 +49,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   let liveScores = [];
   let lastLiveSegmentStartMs = null;
   const liveChordStabilizer = createLiveChordStabilizer({ alpha: 0.18, minScore: 0.52, minMargin: 0.07, confirmMs: 400 });
+  const livePitchTracker = createLivePitchTracker({ minConfidence: 0.22, confirmMs: 280, releaseMs: 350, frequencyAlpha: 0.2 });
   let liveChordResult = null;
-  let pendingLiveNote = null;
-  let pendingLiveNoteCount = 0;
   let currentLiveNote = null;
   let lastPlayheadDrawAt = 0;
   let lastSignalDisplayAt = 0;
@@ -106,8 +106,13 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   [{ pc: 1, after: 0 }, { pc: 3, after: 1 }, { pc: 6, after: 3 }, { pc: 8, after: 4 }, { pc: 10, after: 5 }]
     .forEach(({ pc, after }) => liveKeyboard.append(el('span', { className: 'live-piano-black', 'data-pc': pc, style: `left:${((after + .68) / 7) * 100}%` })));
   liveNoteCard.append(el('span', { className: 'live-note-label' }, 'AFINADOR · NOTA DEL MICRÓFONO'), liveNoteName, tunerMeter, liveKeyboard, liveNoteInfo);
+  const liveSpectrumCard = el('section', { className: 'live-spectrum-card', 'aria-label': 'Espectro de frecuencias captado por el micrófono' });
+  liveSpectrumCard.append(el('h4', {}, 'Espectro en vivo · picos y notas'));
+  const liveSpectrumCanvas = el('canvas', { className: 'live-spectrum-canvas', role: 'img', 'aria-label': 'Espectro de frecuencias logarítmico con picos estimados y sus notas' });
+  const liveSpectrumCaption = el('p', { className: 'live-spectrum-caption' }, 'La forma del espectro muestra la energía; los picos etiquetados son parciales. La nota del afinador usa estimación de fundamental YIN.');
+  liveSpectrumCard.append(liveSpectrumCanvas, liveSpectrumCaption);
   const liveVisuals = el('div', { className: 'audio-live-visuals' });
-  liveVisuals.append(liveRadar.element, liveNoteCard);
+  liveVisuals.append(liveRadar.element, liveNoteCard, liveSpectrumCard);
   const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
   const liveReference = el('strong', { className: 'audio-live-reference' }, 'Referencia: —');
   const liveTransition = el('strong', { className: 'audio-live-transition' }, 'Secuencia: —');
@@ -309,23 +314,20 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   }
   renderSections();
   function updateLiveNote(frame) {
-    const peaks = frame?.spectralPeaks || [];
-    const peak = peaks.filter((item) => Number.isFinite(item.midi) && item.midi >= 28 && item.midi <= 96)
-      .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
-    if (!peak || (peak.strength || 0) < 0.12) {
-      pendingLiveNote = null; pendingLiveNoteCount = 0; currentLiveNote = null;
-      liveNoteName.textContent = '—'; liveNoteInfo.textContent = 'No hay una nota clara en la señal';
+    const result = livePitchTracker.update(frame?.pitchHz, frame?.pitchConfidence, frame?.observedPerfMs || performance.now());
+    currentLiveNote = result.current;
+    if (!currentLiveNote) {
+      const candidate = Number.isFinite(result.candidate)
+        ? `${['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][((result.candidate % 12) + 12) % 12]}${Math.floor(result.candidate / 12) - 1}` : '';
+      liveNoteName.textContent = candidate ? `… ${candidate}` : '—';
+      liveNoteInfo.textContent = candidate ? `Confirmando nota · ${Math.min(280, result.pendingMs)}/280 ms` : 'Esperando una fundamental clara';
       tunerNeedle.style.left = '50%';
       liveKeyboard.querySelectorAll('.is-current').forEach((key) => key.classList.remove('is-current'));
+      drawLiveSpectrum(frame, null);
       return;
     }
-    const key = `${peak.midi}:${peak.note || ''}`;
-    if (key === pendingLiveNote) pendingLiveNoteCount++;
-    else { pendingLiveNote = key; pendingLiveNoteCount = 1; }
-    if (pendingLiveNoteCount >= 2) currentLiveNote = peak;
-    if (!currentLiveNote) { liveNoteName.textContent = '…'; liveNoteInfo.textContent = 'Confirmando altura'; return; }
     const frequency = currentLiveNote.frequencyHz;
-    const midi = Number.isFinite(frequency) && frequency > 0 ? Math.round(69 + 12 * Math.log2(frequency / 440)) : currentLiveNote.midi;
+    const midi = currentLiveNote.midi;
     const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const pitchClass = ((midi % 12) + 12) % 12;
     const note = `${names[pitchClass]}${Math.floor(midi / 12) - 1}`;
@@ -335,12 +337,70 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     tunerNeedle.style.left = `${Math.max(0, Math.min(100, cents + 50))}%`;
     tunerMeter.setAttribute('aria-label', `${note}, ${cents >= 0 ? '+' : ''}${Math.round(cents)} cents respecto a la afinación temperada`);
     liveKeyboard.querySelectorAll('[data-pc]').forEach((key) => key.classList.toggle('is-current', Number(key.dataset.pc) === pitchClass));
-    liveNoteInfo.textContent = `${Math.round(frequency || 0)} Hz · ${cents > 3 ? 'alta' : cents < -3 ? 'baja' : 'afinada'} · ${cents >= 0 ? '+' : ''}${Math.round(cents)} cents`;
+    liveNoteInfo.textContent = `${Math.round(frequency || 0)} Hz · ${cents > 3 ? 'alta' : cents < -3 ? 'baja' : 'afinada'} · ${cents >= 0 ? '+' : ''}${Math.round(cents)} cents · YIN ${Math.round(currentLiveNote.confidence * 100)}%`;
+    drawLiveSpectrum(frame, midi);
+  }
+  function drawLiveSpectrum(frame, detectedMidi) {
+    const rect = liveSpectrumCanvas.getBoundingClientRect();
+    if (!rect.width) return;
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(250, Math.floor(rect.width)); const height = 154;
+    liveSpectrumCanvas.width = Math.floor(width * ratio); liveSpectrumCanvas.height = Math.floor(height * ratio);
+    const ctx = liveSpectrumCanvas.getContext('2d'); ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.fillStyle = '#08110d'; ctx.fillRect(0, 0, width, height);
+    const left = 31, right = width - 8, top = 10, bottom = height - 24;
+    const minHz = 55, maxHz = 5000;
+    const xFor = (frequency) => left + Math.log(Math.max(minHz, Math.min(maxHz, frequency)) / minHz) / Math.log(maxHz / minHz) * (right - left);
+    ctx.font = '8px system-ui,sans-serif'; ctx.textAlign = 'center';
+    for (const frequency of [55, 110, 220, 440, 880, 1760, 3520]) {
+      const x = xFor(frequency); ctx.strokeStyle = 'rgba(196,216,198,.16)'; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bottom); ctx.stroke();
+      ctx.fillStyle = '#a9b9ac'; ctx.fillText(frequency >= 1000 ? `${(frequency / 1000).toFixed(frequency % 1000 ? 1 : 0)}k` : String(frequency), x, height - 8);
+    }
+    for (const level of [.25, .5, .75, 1]) {
+      const y = bottom - level * (bottom - top); ctx.strokeStyle = 'rgba(196,216,198,.11)'; ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(right, y); ctx.stroke();
+    }
+    const bins = frame?.spectrumBins || [];
+    if (bins.length) {
+      ctx.beginPath();
+      bins.forEach((magnitude, index) => {
+        const frequency = minHz * (maxHz / minHz) ** (index / (bins.length - 1));
+        const x = xFor(frequency); const y = bottom - Math.max(0, Math.min(1, magnitude)) * (bottom - top);
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.lineTo(right, bottom); ctx.lineTo(left, bottom); ctx.closePath();
+      ctx.fillStyle = 'rgba(87,215,189,.13)'; ctx.fill();
+      ctx.beginPath();
+      bins.forEach((magnitude, index) => {
+        const frequency = minHz * (maxHz / minHz) ** (index / (bins.length - 1));
+        const x = xFor(frequency); const y = bottom - Math.max(0, Math.min(1, magnitude)) * (bottom - top);
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#58d7bd'; ctx.lineWidth = 1.5; ctx.stroke();
+    } else {
+      ctx.fillStyle = '#aab8ac'; ctx.textAlign = 'center'; ctx.fillText('Esperando datos del espectro', (left + right) / 2, (top + bottom) / 2);
+    }
+    const peaks = (frame?.spectralPeaks || []).filter((peak) => Number.isFinite(peak.frequencyHz) && peak.frequencyHz >= minHz && peak.frequencyHz <= maxHz)
+      .sort((a, b) => (b.strength || 0) - (a.strength || 0)).slice(0, 6);
+    peaks.forEach((peak, index) => {
+      const x = xFor(peak.frequencyHz); const y = bottom - (bins[Math.max(0, Math.min(bins.length - 1, Math.round(Math.log(peak.frequencyHz / minHz) / Math.log(maxHz / minHz) * (bins.length - 1))))] || 0) * (bottom - top);
+      const isFundamental = Number.isFinite(detectedMidi) && peak.midi === detectedMidi;
+      ctx.fillStyle = isFundamental ? '#eff47c' : '#f0a957'; ctx.beginPath(); ctx.arc(x, y, isFundamental ? 3.5 : 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = isFundamental ? '#f1f5ae' : '#e2b870'; ctx.font = '700 8px system-ui,sans-serif';
+      ctx.fillText(peak.note || '', x, Math.max(top + 8, y - 5 - (index % 2) * 8));
+    });
   }
   function updateLiveReference() {
     const segment = currentSegment();
+    const referenceSymbol = segment?.selectedSymbol || segment?.symbol;
+    const frame = liveScores.at(-1)?.frame;
+    const confirmed = liveChordResult?.confirmed;
+    const proposal = liveChordResult?.proposal;
+    if (frame) {
+      const radarSymbol = confirmed?.symbol || proposal?.symbol || referenceSymbol || '';
+      liveRadar.update(liveChordResult?.chroma || frame.chroma, radarSymbol,
+        confirmed ? 'acorde estable' : proposal ? 'propuesta en confirmación' : referenceSymbol ? 'referencia de la pista' : '');
+    }
     if (!segment) return;
-    const referenceSymbol = segment.selectedSymbol || segment.symbol;
     liveReference.textContent = segment.selectedSymbol
       ? `Referencia elegida: ${segment.selectedSymbol}`
       : `Referencia automática (sin confirmar): ${segment.symbol || 'sin acorde claro'}`;
@@ -351,10 +411,6 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       ? `Secuencia de referencia: ${previousSymbol} → ${referenceSymbol}${previous?.selectedSymbol && segment.selectedSymbol ? ' · elegida' : ' · propuesta'}`
       : 'Secuencia: sin acorde anterior para comparar';
     if (liveScores.length && liveScores.at(-1).frame) {
-      const frame = liveScores.at(-1).frame;
-      const confirmed = liveChordResult?.confirmed;
-      const proposal = liveChordResult?.proposal;
-      liveRadar.update(liveChordResult?.chroma || frame.chroma, confirmed?.symbol || '');
       if (confirmed) {
         const matches = confirmed.symbol === referenceSymbol;
         const pending = proposal && proposal.symbol !== confirmed.symbol
@@ -534,6 +590,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveStatus.textContent = 'Iniciando micrófono y analizador local…';
     liveScores = [];
     liveChordStabilizer.reset(); liveChordResult = null;
+    livePitchTracker.reset(); currentLiveNote = null;
     try {
       liveCapture = createMicCapture({
         onFrame: (frame) => {
@@ -585,6 +642,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveStop.disabled = true; liveStart.disabled = false;
     liveView?.setLiveFrame(null);
     liveRadar.update([], '');
+    livePitchTracker.reset();
     updateLiveNote(null); currentLiveNote = null;
     liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
     liveTransition.textContent = 'Secuencia: —';

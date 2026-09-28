@@ -260,9 +260,9 @@
 .live-harmonic-radar-hub strong{font-size:.8rem;color:#eff5e8}
 .live-harmonic-radar-hub span{max-width:90%;font-size:.45rem;line-height:1.1;color:#b8c9bc}
 .live-harmonic-radar[data-has-signal=false] .harmonic-radar-area{fill:rgba(91,220,197,.06);stroke:#668278}
-.audio-live-visuals{display:flex;align-items:center;gap:.65rem;margin:.45rem 0}
+.audio-live-visuals{display:grid;grid-template-columns:164px minmax(250px,340px) minmax(300px,1fr);align-items:stretch;gap:.65rem;margin:.45rem 0}
 .audio-live-visuals .live-harmonic-radar{margin:0}
-.live-note-detector{width:min(340px,100%);min-width:250px;min-height:164px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;padding:.6rem .8rem;border:1px solid #53694d;border-radius:10px;background:radial-gradient(circle at center,#26351d,#101710 72%);text-align:center}
+.live-note-detector{width:100%;min-width:250px;min-height:164px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;padding:.6rem .8rem;border:1px solid #53694d;border-radius:10px;background:radial-gradient(circle at center,#26351d,#101710 72%);text-align:center}
 .live-note-label{color:#bfd879;font-size:.58rem;font-weight:800;letter-spacing:.08em}
 .live-note-name{color:#f3f8d8;font-size:1.65rem;line-height:1;text-shadow:0 0 14px #c9e87566}
 .live-tuner-meter{width:100%;padding:.05rem .25rem}
@@ -277,6 +277,11 @@
 .live-piano-black{position:absolute;z-index:2;top:0;width:6.2%;height:62%;border:1px solid #819080;border-radius:0 0 2px 2px;background:linear-gradient(#313b34,#080b09)}
 .live-piano-black.is-current{background:linear-gradient(#d6ed83,#789b37);box-shadow:0 0 5px #d8ee8b}
 .live-note-info{color:#c3d0c2;font-size:.62rem;line-height:1.25}
+.live-spectrum-card{min-width:0;min-height:164px;padding:.5rem .6rem;border:1px solid #394b3f;border-radius:8px;background:#0d1711}
+.live-spectrum-card h4{margin:0 0 .2rem;color:#eff5e8;font-size:.77rem}
+.live-spectrum-canvas{display:block;width:100%;height:154px;border-radius:4px;background:#08110d}
+.live-spectrum-caption{margin:.15rem 0 0;color:#aab9ad;font-size:.59rem;line-height:1.25}
 @media(max-width:620px){.live-harmonic-radar{align-items:flex-start;flex-direction:column}.live-harmonic-radar-wrap{align-self:center;width:148px;height:148px;flex-basis:148px}}
-@media(max-width:620px){.audio-live-visuals{align-items:stretch;flex-direction:column}.audio-live-visuals .live-harmonic-radar{align-items:center;flex-direction:row}.live-note-detector{width:100%;min-width:0;min-height:160px}}
+@media(max-width:900px){.audio-live-visuals{grid-template-columns:150px minmax(220px,1fr)}.live-spectrum-card{grid-column:1/-1}}
+@media(max-width:620px){.audio-live-visuals{display:flex;align-items:stretch;flex-direction:column}.audio-live-visuals .live-harmonic-radar{align-items:center;flex-direction:row}.live-note-detector{width:100%;min-width:0;min-height:160px}.live-spectrum-card{grid-column:auto}}
 @media(max-width:620px){.analysis-circle-widget-host{width:118px;min-width:118px;flex-basis:118px}.harmonic-circle-widget .harmonic-wheel-wrap{width:112px}.harmonic-circle-widget .harmonic-wheel-note{font-size:11px}.harmonic-history-heading{align-items:flex-start}.harmonic-history-legend{width:100%;justify-content:flex-start}}

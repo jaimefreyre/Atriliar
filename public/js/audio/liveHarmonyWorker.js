@@ -44,6 +44,12 @@ function analyzeWindow(timestampMs) {
     windowed = essentia.Windowing(vector, true, WINDOW_SIZE, 'hann', 0, true);
     spectrum = essentia.Spectrum(windowed.frame, WINDOW_SIZE);
     peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.0001, 5000, 100, 55, 'frequency', TARGET_RATE);
+    let pitchHz = 0, pitchConfidence = 0;
+    try {
+      const pitch = essentia.PitchYinFFT(spectrum.spectrum, WINDOW_SIZE, true, 1600, 45, TARGET_RATE, 1);
+      pitchHz = Number(pitch.pitch) || 0;
+      pitchConfidence = Number(pitch.pitchConfidence) || 0;
+    } catch { /* The spectrum and chroma remain useful when the tuner has no monophonic pitch. */ }
     hpcp = essentia.HPCP(peaks.frequencies, peaks.magnitudes);
     const source = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
     const chroma = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => source[index] || 0);
@@ -60,7 +66,14 @@ function analyzeWindow(timestampMs) {
     const ranked = [...byMidi.values()].sort((a, b) => b.strength - a.strength);
     const maximum = ranked[0]?.strength || 1;
     const notes = ranked.map((peak) => ({ ...peak, strength: peak.strength / maximum }));
-    self.postMessage({ type: 'harmony', timestampMs, chroma,
+    const rawSpectrum = Array.from(essentia.vectorToArray(spectrum.spectrum), Number);
+    const spectrumMaximum = Math.max(...rawSpectrum.filter(Number.isFinite), 1e-9);
+    const spectrumBins = Array.from({ length: 256 }, (_, index) => {
+      const frequency = 55 * (5000 / 55) ** (index / 255);
+      const bin = Math.min(rawSpectrum.length - 1, Math.round(frequency * WINDOW_SIZE / TARGET_RATE));
+      return Math.sqrt(Math.max(0, rawSpectrum[bin] || 0) / spectrumMaximum);
+    });
+    self.postMessage({ type: 'harmony', timestampMs, chroma, pitchHz, pitchConfidence, spectrumBins,
       bassPeaks: notes.filter((peak) => peak.midi < 60).slice(0, 8),
       highPeaks: notes.filter((peak) => peak.midi >= 60).slice(0, 8),
       spectralPeaks: notes.slice(0, 12) });

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v25-live-pitch-tuner';
+const SHELL_CACHE = 'stageprompter-shell-v26-live-spectrum-yin';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
@@ -14,7 +14,7 @@ const SHELL = [
   '/js/transport/generatedBacking.js', '/js/transport/manual.js', '/js/transport/transport.js',
   '/js/ui/audioDraftAssistant.js', '/js/ui/calibrationEditor.js', '/js/ui/dom.js', '/js/ui/importDialog.js',
   '/js/ui/audioAnalysisVisualizer.js', '/js/ui/harmonicCircle.js', '/js/ui/performanceEvaluator.js', '/js/ui/playerView.js', '/js/ui/videoSection.js',
-  '/js/audio/chordTemplateMatch.js', '/js/audio/decodeLocalFile.js', '/js/audio/draftBuilder.js',
+  '/js/audio/chordTemplateMatch.js', '/js/audio/livePitchTracker.js', '/js/audio/liveChordStabilizer.js', '/js/audio/decodeLocalFile.js', '/js/audio/draftBuilder.js',
   '/js/audio/auditionRange.js', '/js/audio/labComposition.js',
   '/js/audio/waveformEnvelope.js',
   '/js/audio/essentiaAnalysisWorker.js', '/js/audio/liveHarmonyWorker.js', '/js/audio/chromaSimilarity.js',
