@@ -48,6 +48,9 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   let liveScores = [];
   let lastLiveSegmentStartMs = null;
   let smoothedLiveChroma = [];
+  let pendingLiveNote = null;
+  let pendingLiveNoteCount = 0;
+  let currentLiveNote = null;
   let lastPlayheadDrawAt = 0;
   let lastSignalDisplayAt = 0;
   let liveInputQuality = 'low';
@@ -83,6 +86,12 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     sectionList, sectionEditor);
   const livePanel = el('section', { className: 'audio-live-panel', hidden: 'hidden', 'aria-label': 'Karaoke de análisis en vivo' });
   const liveRadar = createLiveHarmonicRadar();
+  const liveNoteCard = el('section', { className: 'live-note-detector', 'aria-live': 'polite', 'aria-label': 'Nota estimada que suena en el micrófono' });
+  const liveNoteName = el('strong', { className: 'live-note-name' }, '—');
+  const liveNoteInfo = el('span', { className: 'live-note-info' }, 'Esperando señal del micrófono');
+  liveNoteCard.append(el('span', { className: 'live-note-label' }, 'NOTA ESTIMADA AHORA'), liveNoteName, liveNoteInfo);
+  const liveVisuals = el('div', { className: 'audio-live-visuals' });
+  liveVisuals.append(liveRadar.element, liveNoteCard);
   const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
   const liveReference = el('strong', { className: 'audio-live-reference' }, 'Referencia: —');
   const liveTransition = el('strong', { className: 'audio-live-transition' }, 'Secuencia: —');
@@ -111,7 +120,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   const actions = el('footer', { className: 'audio-draft-actions' }); actions.append(analyze, saveLab, create);
   livePanel.append(el('h3', {}, 'Karaoke de análisis en vivo'),
     el('p', { className: 'audio-live-note' }, 'Inicia el micrófono y reproduce la pista para comparar la entrada con el tramo actual. Usa auriculares para que la pista no se filtre al micrófono. Se analiza localmente; el porcentaje compara perfiles de croma y no es una nota de ejecución. Si cantas una sola nota, puede faltar información para confirmar el acorde completo.'),
-    liveStatus, liveMetrics, liveCompatibility, liveRadar.element, liveActions);
+    liveStatus, liveMetrics, liveCompatibility, liveVisuals, liveActions);
   const labHeader = el('header', { className: 'lab-header' });
   const modes = el('nav', { className: 'lab-mode-nav', 'aria-label': 'Vistas del proyecto' });
   modes.append(el('span', { className: 'lab-mode-active', 'aria-current': 'page' }, 'Laboratorio'), editMode, stageMode);
@@ -283,6 +292,23 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     sectionEditor.firstChild.append(el('strong', {}, 'Editar sección'), split);
   }
   renderSections();
+  function updateLiveNote(frame) {
+    const peaks = frame?.spectralPeaks || [];
+    const peak = peaks.filter((item) => Number.isFinite(item.midi) && item.midi >= 28 && item.midi <= 96)
+      .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
+    if (!peak || (peak.strength || 0) < 0.12) {
+      pendingLiveNote = null; pendingLiveNoteCount = 0;
+      liveNoteName.textContent = '—'; liveNoteInfo.textContent = 'No hay una nota clara en la señal';
+      return;
+    }
+    const key = `${peak.midi}:${peak.note || ''}`;
+    if (key === pendingLiveNote) pendingLiveNoteCount++;
+    else { pendingLiveNote = key; pendingLiveNoteCount = 1; }
+    if (pendingLiveNoteCount >= 2) currentLiveNote = peak;
+    if (!currentLiveNote) { liveNoteName.textContent = '…'; liveNoteInfo.textContent = 'Confirmando altura'; return; }
+    liveNoteName.textContent = currentLiveNote.note || `MIDI ${currentLiveNote.midi}`;
+    liveNoteInfo.textContent = `${Math.round(currentLiveNote.frequencyHz || 0)} Hz · pico espectral dominante (octava estimada)`;
+  }
   function updateLiveReference() {
     const segment = currentSegment();
     if (!segment) return;
@@ -489,6 +515,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
           if (liveInputQuality !== 'ok') {
             liveView?.setLiveFrame(null);
             liveRadar.update([], '');
+            updateLiveNote(null);
+            currentLiveNote = null;
             liveGuess.textContent = liveInputQuality === 'clipping' ? 'Escucha: señal saturada' : 'Escucha: esperando señal clara';
             liveSimilarity.textContent = 'Afinidad armónica: pausada por nivel de señal';
             return;
@@ -506,6 +534,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
           liveScores.push({ at: Date.now(), affinity: frame.affinity, frame });
           liveScores = liveScores.filter((item) => Date.now() - item.at < 5000).slice(-60);
           liveView?.setLiveFrame(frame);
+          updateLiveNote(frame);
           updateLiveReference();
         },
         onStatus: (state) => { if (state.message) liveStatus.textContent = state.message; },
@@ -523,6 +552,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveStop.disabled = true; liveStart.disabled = false;
     liveView?.setLiveFrame(null);
     liveRadar.update([], '');
+    updateLiveNote(null); currentLiveNote = null;
     liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
     liveTransition.textContent = 'Secuencia: —';
     liveCompatibility.textContent = 'Compatibilidad con el acorde elegido: —';

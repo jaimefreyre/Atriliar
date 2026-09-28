@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v22-live-harmonic-radar';
+const SHELL_CACHE = 'stageprompter-shell-v23-live-note-detector';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
