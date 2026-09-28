@@ -90,7 +90,22 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   const liveNoteCard = el('section', { className: 'live-note-detector', 'aria-live': 'polite', 'aria-label': 'Nota estimada que suena en el micrófono' });
   const liveNoteName = el('strong', { className: 'live-note-name' }, '—');
   const liveNoteInfo = el('span', { className: 'live-note-info' }, 'Esperando señal del micrófono');
-  liveNoteCard.append(el('span', { className: 'live-note-label' }, 'NOTA ESTIMADA AHORA'), liveNoteName, liveNoteInfo);
+  const tunerMeter = el('div', { className: 'live-tuner-meter', role: 'img', 'aria-label': 'Desviación de afinación desde menos 50 a más 50 cents' });
+  const tunerTicks = el('div', { className: 'live-tuner-ticks' });
+  for (const tick of [-50, -25, 0, 25, 50]) tunerTicks.append(el('span', { className: tick === 0 ? 'is-center' : '' }, `${tick > 0 ? '+' : ''}${tick}`));
+  const tunerTrack = el('div', { className: 'live-tuner-track' });
+  const tunerCenter = el('span', { className: 'live-tuner-center' });
+  const tunerNeedle = el('span', { className: 'live-tuner-needle' });
+  tunerTrack.append(tunerCenter, tunerNeedle); tunerMeter.append(tunerTicks, tunerTrack);
+  const liveKeyboard = el('div', { className: 'live-tuner-keyboard', role: 'img', 'aria-label': 'Teclado cromático con la nota detectada resaltada' });
+  const naturalNotes = [
+    { pc: 0, note: 'C' }, { pc: 2, note: 'D' }, { pc: 4, note: 'E' }, { pc: 5, note: 'F' },
+    { pc: 7, note: 'G' }, { pc: 9, note: 'A' }, { pc: 11, note: 'B' },
+  ];
+  naturalNotes.forEach(({ pc, note }, index) => liveKeyboard.append(el('span', { className: 'live-piano-white', 'data-pc': pc, style: `left:${index * (100 / 7)}%;width:${100 / 7}%` }, note)));
+  [{ pc: 1, after: 0 }, { pc: 3, after: 1 }, { pc: 6, after: 3 }, { pc: 8, after: 4 }, { pc: 10, after: 5 }]
+    .forEach(({ pc, after }) => liveKeyboard.append(el('span', { className: 'live-piano-black', 'data-pc': pc, style: `left:${((after + .68) / 7) * 100}%` })));
+  liveNoteCard.append(el('span', { className: 'live-note-label' }, 'AFINADOR · NOTA DEL MICRÓFONO'), liveNoteName, tunerMeter, liveKeyboard, liveNoteInfo);
   const liveVisuals = el('div', { className: 'audio-live-visuals' });
   liveVisuals.append(liveRadar.element, liveNoteCard);
   const liveStatus = el('p', { className: 'audio-live-status', role: 'status', 'aria-live': 'polite' }, 'Micrófono apagado');
@@ -298,8 +313,10 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     const peak = peaks.filter((item) => Number.isFinite(item.midi) && item.midi >= 28 && item.midi <= 96)
       .sort((a, b) => (b.strength || 0) - (a.strength || 0))[0];
     if (!peak || (peak.strength || 0) < 0.12) {
-      pendingLiveNote = null; pendingLiveNoteCount = 0;
+      pendingLiveNote = null; pendingLiveNoteCount = 0; currentLiveNote = null;
       liveNoteName.textContent = '—'; liveNoteInfo.textContent = 'No hay una nota clara en la señal';
+      tunerNeedle.style.left = '50%';
+      liveKeyboard.querySelectorAll('.is-current').forEach((key) => key.classList.remove('is-current'));
       return;
     }
     const key = `${peak.midi}:${peak.note || ''}`;
@@ -307,8 +324,18 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     else { pendingLiveNote = key; pendingLiveNoteCount = 1; }
     if (pendingLiveNoteCount >= 2) currentLiveNote = peak;
     if (!currentLiveNote) { liveNoteName.textContent = '…'; liveNoteInfo.textContent = 'Confirmando altura'; return; }
-    liveNoteName.textContent = currentLiveNote.note || `MIDI ${currentLiveNote.midi}`;
-    liveNoteInfo.textContent = `${Math.round(currentLiveNote.frequencyHz || 0)} Hz · pico espectral dominante (octava estimada)`;
+    const frequency = currentLiveNote.frequencyHz;
+    const midi = Number.isFinite(frequency) && frequency > 0 ? Math.round(69 + 12 * Math.log2(frequency / 440)) : currentLiveNote.midi;
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const pitchClass = ((midi % 12) + 12) % 12;
+    const note = `${names[pitchClass]}${Math.floor(midi / 12) - 1}`;
+    const referenceHz = 440 * 2 ** ((midi - 69) / 12);
+    const cents = frequency > 0 ? 1200 * Math.log2(frequency / referenceHz) : 0;
+    liveNoteName.textContent = note;
+    tunerNeedle.style.left = `${Math.max(0, Math.min(100, cents + 50))}%`;
+    tunerMeter.setAttribute('aria-label', `${note}, ${cents >= 0 ? '+' : ''}${Math.round(cents)} cents respecto a la afinación temperada`);
+    liveKeyboard.querySelectorAll('[data-pc]').forEach((key) => key.classList.toggle('is-current', Number(key.dataset.pc) === pitchClass));
+    liveNoteInfo.textContent = `${Math.round(frequency || 0)} Hz · ${cents > 3 ? 'alta' : cents < -3 ? 'baja' : 'afinada'} · ${cents >= 0 ? '+' : ''}${Math.round(cents)} cents`;
   }
   function updateLiveReference() {
     const segment = currentSegment();

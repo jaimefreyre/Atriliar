@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v24-live-chord-stability';
+const SHELL_CACHE = 'stageprompter-shell-v25-live-pitch-tuner';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [
