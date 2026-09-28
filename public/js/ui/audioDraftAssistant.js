@@ -6,7 +6,7 @@ import { openPlayerView } from './playerView.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
 import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
 import { createMicCapture } from '../audio/micCapture.js';
-import { matchChordTemplate } from '../audio/chordTemplateMatch.js';
+import { createLiveChordStabilizer } from '../audio/liveChordStabilizer.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
 import { scoreChordChroma } from '../music/chromaMatch.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
@@ -47,7 +47,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   let liveView = null;
   let liveScores = [];
   let lastLiveSegmentStartMs = null;
-  let smoothedLiveChroma = [];
+  const liveChordStabilizer = createLiveChordStabilizer({ alpha: 0.18, minScore: 0.52, minMargin: 0.07, confirmMs: 400 });
+  let liveChordResult = null;
   let pendingLiveNote = null;
   let pendingLiveNoteCount = 0;
   let currentLiveNote = null;
@@ -324,10 +325,17 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       : 'Secuencia: sin acorde anterior para comparar';
     if (liveScores.length && liveScores.at(-1).frame) {
       const frame = liveScores.at(-1).frame;
-      const guess = matchChordTemplate(smoothedLiveChroma.length ? smoothedLiveChroma : frame.chroma, { minScore: 0.5, minMargin: 0.03 });
-      liveRadar.update(smoothedLiveChroma.length ? smoothedLiveChroma : frame.chroma, guess.symbol || '');
-      const matches = guess.symbol === referenceSymbol;
-      liveGuess.textContent = `Escucha estimada: ${guess.symbol} · ajuste ${guess.score.toFixed(2)}${matches ? ' · coincide con el tramo' : ''}`;
+      const confirmed = liveChordResult?.confirmed;
+      const proposal = liveChordResult?.proposal;
+      liveRadar.update(liveChordResult?.chroma || frame.chroma, confirmed?.symbol || '');
+      if (confirmed) {
+        const matches = confirmed.symbol === referenceSymbol;
+        const pending = proposal && proposal.symbol !== confirmed.symbol
+          ? ` · verificando ${proposal.symbol} (${Math.min(400, liveChordResult.pendingMs)}/400 ms)` : '';
+        liveGuess.textContent = `Acorde estable: ${confirmed.symbol} · ajuste ${confirmed.score.toFixed(2)}${matches ? ' · coincide con el tramo' : ''}${pending}`;
+      } else if (proposal) {
+        liveGuess.textContent = `Evaluando ${proposal.symbol} · ${Math.min(400, liveChordResult.pendingMs)}/400 ms antes de confirmar`;
+      } else liveGuess.textContent = 'Escucha estimada: armonía ambigua; esperando una propuesta clara';
       if (referenceSymbol && segment.chroma) {
         const recentScores = liveScores.filter((item) => Date.now() - item.at < 2500 && item.affinity !== null)
           .map((item) => item.affinity);
@@ -498,7 +506,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveStart.disabled = true;
     liveStatus.textContent = 'Iniciando micrófono y analizador local…';
     liveScores = [];
-    smoothedLiveChroma = [];
+    liveChordStabilizer.reset(); liveChordResult = null;
     try {
       liveCapture = createMicCapture({
         onFrame: (frame) => {
@@ -517,6 +525,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
             liveRadar.update([], '');
             updateLiveNote(null);
             currentLiveNote = null;
+            liveChordStabilizer.reset(); liveChordResult = null;
             liveGuess.textContent = liveInputQuality === 'clipping' ? 'Escucha: señal saturada' : 'Escucha: esperando señal clara';
             liveSimilarity.textContent = 'Afinidad armónica: pausada por nivel de señal';
             return;
@@ -527,10 +536,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
           }
           const segment = segmentAt(Number.isFinite(frame.playbackPositionMs) ? frame.playbackPositionMs : playbackPositionMs());
           frame.affinity = segment?.chroma ? compareChroma(segment.chroma, frame.chroma) : null;
-          smoothedLiveChroma = Array.from({ length: 12 }, (_, index) => {
-            const previous = smoothedLiveChroma[index] || 0;
-            return previous * 0.65 + frame.chroma[index] * 0.35;
-          });
+          liveChordResult = liveChordStabilizer.update(frame.chroma, frame.observedPerfMs || performance.now());
           liveScores.push({ at: Date.now(), affinity: frame.affinity, frame });
           liveScores = liveScores.filter((item) => Date.now() - item.at < 5000).slice(-60);
           liveView?.setLiveFrame(frame);
@@ -556,7 +562,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
     liveTransition.textContent = 'Secuencia: —';
     liveCompatibility.textContent = 'Compatibilidad con el acorde elegido: —';
-    smoothedLiveChroma = [];
+    liveChordStabilizer.reset(); liveChordResult = null;
     liveStatus.textContent = 'Micrófono apagado';
     liveInputQuality = 'low';
   });
