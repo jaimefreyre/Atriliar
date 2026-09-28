@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'stageprompter-shell-v26-live-spectrum-yin';
+const SHELL_CACHE = 'stageprompter-shell-v27-live-analysis-layout';
 const SET_CACHE = 'stageprompter-set-assets-v1';
 const TOOLS_CACHE = 'stageprompter-optional-tools-v1';
 const SHELL = [

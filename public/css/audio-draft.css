@@ -283,5 +283,30 @@
 .live-spectrum-caption{margin:.15rem 0 0;color:#aab9ad;font-size:.59rem;line-height:1.25}
 @media(max-width:620px){.live-harmonic-radar{align-items:flex-start;flex-direction:column}.live-harmonic-radar-wrap{align-self:center;width:148px;height:148px;flex-basis:148px}}
 @media(max-width:900px){.audio-live-visuals{grid-template-columns:150px minmax(220px,1fr)}.live-spectrum-card{grid-column:1/-1}}
-@media(max-width:620px){.audio-live-visuals{display:flex;align-items:stretch;flex-direction:column}.audio-live-visuals .live-harmonic-radar{align-items:center;flex-direction:row}.live-note-detector{width:100%;min-width:0;min-height:160px}.live-spectrum-card{grid-column:auto}}
+@media(max-width:620px){.audio-live-visuals{display:flex;align-items:stretch;flex-direction:column}.audio-live-visuals .live-harmonic-radar{align-items:center;flex-direction:column}.live-note-detector{width:100%;min-width:0;min-height:160px}.live-spectrum-card{grid-column:auto}}
+
+/* Keep the live sound lab aligned while labels and pitch estimates update. */
+.audio-live-visuals>*{box-sizing:border-box;min-width:0}
+.audio-live-visuals{grid-template-columns:minmax(150px,164px) minmax(250px,340px) minmax(300px,1fr)}
+.live-harmonic-radar{display:grid;grid-template-rows:auto 1fr;justify-items:center;align-content:center;gap:.2rem;width:100%;min-width:0;height:192px;margin:0;padding:.38rem;}
+.live-harmonic-radar h4{width:100%;min-width:0;text-align:center;line-height:1.1;font-size:.67rem;overflow-wrap:anywhere}
+.live-harmonic-radar-wrap{align-self:center;width:min(100%,150px);height:auto;aspect-ratio:1;min-width:0;flex:none}
+.live-harmonic-radar-hub{inset:34% 26%}
+.live-harmonic-radar-hub strong{font-size:.68rem;white-space:nowrap}
+.live-harmonic-radar-hub span{max-width:96%;font-size:.42rem;font-weight:600}
+.live-harmonic-radar-wrap svg{overflow:clip}
+.live-note-detector{width:auto;height:192px;min-width:0;min-height:0;box-sizing:border-box;gap:.3rem;padding:.45rem .65rem}
+.live-spectrum-card{height:192px;min-height:0;box-sizing:border-box}
+.live-spectrum-card h4{font-size:.68rem;line-height:1.1}
+.live-spectrum-canvas{height:132px}
+.live-spectrum-caption{font-size:.62rem;font-weight:500;line-height:1.15}
+.audio-live-panel h3{font-size:.98rem;line-height:1.2}
+.audio-live-note{font-size:.76rem;line-height:1.35}
+.audio-live-status{min-height:38px;box-sizing:border-box;margin:.5rem 0;padding:7px 10px;font-size:.88rem;line-height:1.25}
+.audio-live-metrics{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;gap:7px}
+.audio-live-metrics>*{display:flex;align-items:center;min-width:0;height:76px;min-height:76px;box-sizing:border-box;padding:8px 10px;font-size:.86rem;font-weight:650;line-height:1.22;overflow-wrap:anywhere}
+.audio-live-compatibility{display:flex;align-items:center;height:38px;min-height:38px;box-sizing:border-box;margin:.35rem 0;font-size:.8rem;line-height:1.2}
+@media(max-width:1100px){.audio-live-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.audio-live-visuals{grid-template-columns:minmax(150px,164px) minmax(0,1fr)}.live-spectrum-card{grid-column:1/-1}}
+@media(max-width:620px){.audio-live-visuals{display:flex;flex-direction:column}.live-harmonic-radar{height:190px}.live-note-detector{height:192px}.live-spectrum-card{height:192px}.audio-live-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.analysis-circle-widget-host{width:118px;min-width:118px;flex-basis:118px}.harmonic-circle-widget .harmonic-wheel-wrap{width:112px}.harmonic-circle-widget .harmonic-wheel-note{font-size:11px}.harmonic-history-heading{align-items:flex-start}.harmonic-history-legend{width:100%;justify-content:flex-start}}
