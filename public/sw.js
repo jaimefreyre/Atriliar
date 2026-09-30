@@ -1,9 +1,11 @@
 // @generated-shell-begin (npm run build:shell; no editar a mano)
-const SHELL_CACHE = 'stageprompter-shell-bd78972c2f3b';
+const SHELL_CACHE = 'stageprompter-shell-24961e6921fa';
 const SHELL = [
   '/',
+  '/legacy.html',
   '/css/audio-draft.css',
   '/css/components.css',
+  '/css/dialogs.css',
   '/css/evaluator.css',
   '/css/main.css',
   '/css/prompter.css',
@@ -60,6 +62,7 @@ const SHELL = [
   '/js/harmony/liveChordTracker.js',
   '/js/harmony/nnlsChroma.js',
   '/js/harmony/synthProgression.js',
+  '/js/legacyApp.js',
   '/js/music/harmony.js',
   '/js/music/notes.js',
   '/js/music/scales.js',
@@ -84,12 +87,20 @@ const SHELL = [
   '/js/ui/audioAnalysisVisualizer.js',
   '/js/ui/audioDraftAssistant.js',
   '/js/ui/calibrationEditor.js',
+  '/js/ui/components/dialogs.js',
   '/js/ui/dom.js',
   '/js/ui/harmonicCircle.js',
   '/js/ui/importDialog.js',
+  '/js/ui/library/libraryView.js',
   '/js/ui/multitrackWorkspace.js',
   '/js/ui/performanceEvaluator.js',
   '/js/ui/playerView.js',
+  '/js/ui/shell/appShell.js',
+  '/js/ui/shell/dock.js',
+  '/js/ui/shell/inspectorHost.js',
+  '/js/ui/shell/keymap.js',
+  '/js/ui/shell/legacyHost.js',
+  '/js/ui/shell/router.js',
   '/js/ui/videoSection.js',
 ];
 // @generated-shell-end

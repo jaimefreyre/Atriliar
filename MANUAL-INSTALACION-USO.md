@@ -62,6 +62,8 @@ La terminal debe permanecer abierta mientras uses la app. Abre [http://localhost
 
 En macOS/Linux, el comando para activar el entorno virtual es normalmente source .venv-separation/bin/activate; define PORT y STAGEPROMPTER_PYTHON con la ruta a ese Python y ejecuta npm start. Instala PyTorch según el sistema operativo y hardware usando el selector oficial.
 
+Al abrir la raíz (`http://localhost:3000/`) se muestra el shell nuevo E2b: biblioteca, navegación del proyecto e inspector. El laboratorio anterior vive temporalmente en `legacy.html` y se carga dentro del shell al abrir una vista; se irá sustituyendo en las etapas E3–E6. Para comparar puntualmente con la pantalla anterior se puede abrir `http://localhost:3000/?ui=legacy`.
+
 ### Comprobación rápida
 
 En otra terminal de PowerShell:
@@ -84,12 +86,12 @@ Ambos deben terminar sin fallas. El segundo imprime, por progresión y por sensi
 
 ## 5. Recorrido inicial
 
-1. Abre el proyecto en localhost y entra al **Laboratorio del sonido**.
-2. En **Fuente y proyecto**, selecciona un audio o video compatible, completa título y artista si quieres, y pulsa **Analizar archivo**.
-3. Espera a que termine el análisis; el estado muestra el avance (tempo y pulsos → picos espectrales → armonía). Una canción de 5 minutos tarda alrededor de medio minuto. El BPM sugerido se puede corregir.
-4. Revisa los acordes en **Autopsia del audio**: elige la **Sensibilidad de cambios**, escucha cada tramo y confirma o corrige los que no suenen bien.
-5. Usa los otros espacios de trabajo: **Karaoke y escucha en vivo**, **Autopsia multipista** y **Loopera**.
-6. Guarda con **Guardar laboratorio**. **Crear canción editable** convierte el laboratorio en una canción con **todos** los acordes: los que confirmaste y los automáticos, que quedan marcados como estimados. Revísala en **Escritura y calibración** y ábrela en **Escenario**.
+1. Abre la raíz del proyecto en localhost. La biblioteca E2b ofrece **Nueva desde audio**, **Canción sin audio**, importación y respaldo JSON.
+2. Pulsa **Nueva desde audio** para abrir Autopsia; selecciona el archivo y usa el analizador del laboratorio. Para una pieza sin audio, usa **Canción sin audio**.
+3. Dentro de un proyecto, cambia de vista con la navegación superior. Los atajos `1`–`5` abren Autopsia, Cifrado, Loopera, Karaoke y Atril; `Escape` vuelve a la biblioteca. El foco no debe estar dentro de un campo de edición al usar estos atajos.
+4. La biblioteca permite buscar por título/artista, filtrar por estado de revisión, ver el uso local y abrir o eliminar piezas. **Importar JSON** acepta canciones y respaldos; **Descargar respaldo** exporta los datos admitidos.
+
+**Estado por etapas:** E2b reorganiza la entrada y navegación. Autopsia, Cifrado, Loopera, Karaoke, Atril y Multipista siguen usando temporalmente las vistas preexistentes dentro del shell; el análisis armónico, la edición y los controles específicos se documentan en las secciones siguientes y se reemplazarán por etapas. Algunas vistas conservan sus propios controles hasta unificarse el transporte.
 
 El campo de archivo del navegador se vacía al recargar la página. Vuelve a seleccionar el archivo para usar acciones que necesitan el archivo original, como iniciar una nueva separación.
 
@@ -116,7 +118,7 @@ Es la vista principal para explorar la mezcla completa.
 - **Evidencia por golpe (solo lectura)** muestra qué sonó en cada pulso (croma, picos, bajo) junto al acorde de la pista. Sirve para entender una decisión; el acorde se corrige en el tramo.
 - La tarjeta del tramo indica la confianza, cuánto se sostiene la nota de color, qué tan fiable es el bajo y la fuerza del cambio. Con confianza baja aparece "Propuesta cercana": escucha y corrige.
 - La huella de croma coteja en los mismos ejes la energía medida y las notas esperadas del acorde.
-- **Laboratorios guardados con la versión anterior.** Al abrirlos, tus acordes elegidos, por tramo **y** por golpe, se conservan como decisiones. El resto se reconstruye en forma provisoria y el estado dice "Acordes convertidos del motor anterior". Pulsa **Analizar archivo** para usar el motor nuevo: tus acordes se mantienen.
+- Los registros locales anteriores al esquema v4 se borran al abrir esta versión por primera vez. No se convierten ni se restauran automáticamente; puedes importar un respaldo que hayas guardado por separado.
 - El inspector puede mostrar posiciones teóricas en guitarra, bajo o piano, notas estimadas y tablatura escrita. El diapasón no afirma que el audio se haya separado por instrumento; representa posiciones posibles para tocar.
 - La estructura editable permite dividir una sección en el cursor y añadir tipo, nombre, letra y tablatura ASCII. Las ediciones se guardan en el proyecto local.
 
@@ -215,16 +217,10 @@ El audio y los resultados no salen de la computadora.
 
 ## 8. Atajos de teclado
 
-- M: activar o apagar el micrófono.
-- 1: Autopsia del audio.
-- 2: Karaoke y escucha en vivo.
-- 3: Autopsia multipista.
-- 4: Loopera.
-- R: activar o desactivar la comparación entre micrófono y audio; en la Loopera, grabar una capa.
-- Flechas izquierda/derecha: tramo anterior o siguiente en Autopsia.
-- Barra espaciadora: reproducir/pausar la Loopera cuando esa vista está activa; en otras vistas controla el reproductor principal.
+- En el shell E2b, `1` abre Autopsia, `2` Cifrado, `3` Loopera, `4` Karaoke y `5` Atril. `Escape` vuelve a la biblioteca.
+- Los atajos propios de una vista heredada se conservan dentro de esa vista y no sustituyen la navegación global. Su alcance se documenta junto a cada modo cuando se migre en las siguientes etapas.
 
-Los atajos no actúan mientras escribes en un campo o control de texto.
+Los atajos globales no actúan mientras escribes en un campo o control de texto.
 
 ## 9. Arquitectura y flujo de datos
 

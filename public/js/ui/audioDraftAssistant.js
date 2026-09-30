@@ -38,7 +38,7 @@ function createAssetId() {
 }
 
 /** Local-only optional assistant. All audio analysis happens in its module Worker. */
-export async function openAudioDraftAssistant({ projectId: existingProjectId = null, songId = null, onClose = () => {} } = {}) {
+export async function openAudioDraftAssistant({ projectId: existingProjectId = null, songId = null, initialMode = null, onClose = () => {} } = {}) {
   if (document.getElementById('audio-draft-assistant')) return;
   cacheOptionalAudioTools().catch(() => {});
   let selectedFile = null;
@@ -323,7 +323,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   multitrackView.audioPanel.hidden = true; multitrackView.looperPanel.hidden = true;
   try {
     const savedMode = localStorage.getItem('stageprompter:workspace:v1');
-    if (['karaoke', 'autopsy', 'stems', 'looper'].includes(savedMode)) setWorkspaceMode(savedMode);
+    const workspaceMode = ['karaoke', 'autopsy', 'stems', 'looper'].includes(initialMode) ? initialMode : savedMode;
+    if (['karaoke', 'autopsy', 'stems', 'looper'].includes(workspaceMode)) setWorkspaceMode(workspaceMode);
   } catch { /* storage may be disabled */ }
 
   function projectSnapshot() {
@@ -356,6 +357,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       projectId = result.project.projectId;
       projectAudioAssetId = result.project.audioAssetId || projectAudioAssetId;
       if (assetToSave) pendingAsset = null;
+      if (window.parent !== window) window.parent.postMessage({ type: 'stageprompter:project-ready', songId: result.songId }, window.location.origin);
       return result;
     });
     return saveQueue.then((result) => {

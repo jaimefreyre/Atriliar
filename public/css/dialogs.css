@@ -1,0 +1,26 @@
+@layer components {
+  .sp-dialog {
+    inline-size: min(34rem, calc(100vw - 2rem));
+    max-block-size: min(80dvh, 48rem);
+    overflow: auto;
+    margin: auto;
+    padding: 0;
+    color: var(--color-text, #eef2ee);
+    background: var(--color-surface-2, #151a19);
+    border: 1px solid var(--color-border-strong, #3a4441);
+    border-radius: var(--radius-lg, 0.875rem);
+    box-shadow: var(--shadow-raised, 0 8px 24px #0009);
+  }
+  .sp-dialog::backdrop { background: rgb(0 0 0 / 0.68); }
+  .sp-dialog form { margin: 0; }
+  .sp-dialog__body { display: grid; gap: 0.75rem; padding: 1.5rem; }
+  .sp-dialog__body h2 { font-size: 1.125rem; }
+  .sp-dialog__message { color: var(--color-text-secondary, #cbd2ca); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .sp-dialog__message ul { display: grid; gap: 0.35rem; padding-inline-start: 1.25rem; }
+  .sp-dialog__actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; padding: 0 1.5rem 1.5rem; }
+  .sp-toast-region { position: fixed; inset-inline-end: 1rem; inset-block-end: 1rem; z-index: 100; display: grid; gap: 0.5rem; inline-size: min(26rem, calc(100vw - 2rem)); }
+  .sp-toast { padding: 0.75rem 1rem; color: var(--color-text, #eef2ee); background: var(--color-surface-3, #1c2221); border: 1px solid var(--color-border-strong, #3a4441); border-radius: 0.625rem; box-shadow: 0 8px 24px #0008; font-size: max(0.875rem, 12px); }
+  .sp-toast--success { border-inline-start: 0.25rem solid var(--color-confirmed, #86dc93); }
+  .sp-toast--warning { border-inline-start: 0.25rem solid var(--color-estimated, #e6c066); }
+  .sp-toast--danger { border-inline-start: 0.25rem solid var(--color-danger, #ff8a7e); }
+}

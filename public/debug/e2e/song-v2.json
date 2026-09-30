@@ -1,0 +1,567 @@
+{
+  "schemaVersion": 2,
+  "id": "demo-camino-de-luz-v2",
+  "metadata": {
+    "title": "Camino de luz · demo original",
+    "artist": "Composición de demostración",
+    "key": "C",
+    "bpm": 120,
+    "timeSignature": {
+      "numerator": 4,
+      "denominator": 4
+    }
+  },
+  "durationMs": 32000,
+  "timing": {
+    "status": "estimated",
+    "method": "grid",
+    "notes": "Composición original de demostración: 16 compases de 4/4 a 120 negras por minuto. Acorde por compás. Tokens distribuidos uniformemente solo para probar karaoke; no representan una voz grabada ni alineación real."
+  },
+  "audio": null,
+  "sections": [
+    {
+      "id": "section-intro",
+      "type": "intro",
+      "label": "INTRO",
+      "key": "C",
+      "startMs": 0,
+      "endMs": 4000
+    },
+    {
+      "id": "section-verse",
+      "type": "verse",
+      "label": "VERSO",
+      "key": "C",
+      "startMs": 4000,
+      "endMs": 16000
+    },
+    {
+      "id": "section-chorus",
+      "type": "chorus",
+      "label": "ESTRIBILLO",
+      "key": "C",
+      "startMs": 16000,
+      "endMs": 28000
+    },
+    {
+      "id": "section-outro",
+      "type": "outro",
+      "label": "CIERRE",
+      "key": "C",
+      "startMs": 28000,
+      "endMs": 32000
+    }
+  ],
+  "lines": [
+    {
+      "id": "line-verse-1",
+      "sectionId": "section-verse",
+      "startMs": 4000,
+      "endMs": 8000,
+      "text": "Enciende la luz del camino",
+      "tokens": [
+        {
+          "text": "Enciende",
+          "startMs": 4000,
+          "endMs": 4800,
+          "charStart": 0,
+          "charEnd": 8
+        },
+        {
+          "text": "la",
+          "startMs": 4800,
+          "endMs": 5600,
+          "charStart": 9,
+          "charEnd": 11
+        },
+        {
+          "text": "luz",
+          "startMs": 5600,
+          "endMs": 6400,
+          "charStart": 12,
+          "charEnd": 15
+        },
+        {
+          "text": "del",
+          "startMs": 6400,
+          "endMs": 7200,
+          "charStart": 16,
+          "charEnd": 19
+        },
+        {
+          "text": "camino",
+          "startMs": 7200,
+          "endMs": 8000,
+          "charStart": 20,
+          "charEnd": 26
+        }
+      ]
+    },
+    {
+      "id": "line-verse-2",
+      "sectionId": "section-verse",
+      "startMs": 8000,
+      "endMs": 12000,
+      "text": "Mis pasos encuentran su voz",
+      "tokens": [
+        {
+          "text": "Mis",
+          "startMs": 8000,
+          "endMs": 8800,
+          "charStart": 0,
+          "charEnd": 3
+        },
+        {
+          "text": "pasos",
+          "startMs": 8800,
+          "endMs": 9600,
+          "charStart": 4,
+          "charEnd": 9
+        },
+        {
+          "text": "encuentran",
+          "startMs": 9600,
+          "endMs": 10400,
+          "charStart": 10,
+          "charEnd": 20
+        },
+        {
+          "text": "su",
+          "startMs": 10400,
+          "endMs": 11200,
+          "charStart": 21,
+          "charEnd": 23
+        },
+        {
+          "text": "voz",
+          "startMs": 11200,
+          "endMs": 12000,
+          "charStart": 24,
+          "charEnd": 27
+        }
+      ]
+    },
+    {
+      "id": "line-verse-3",
+      "sectionId": "section-verse",
+      "startMs": 12000,
+      "endMs": 16000,
+      "text": "La noche respira conmigo",
+      "tokens": [
+        {
+          "text": "La",
+          "startMs": 12000,
+          "endMs": 13000,
+          "charStart": 0,
+          "charEnd": 2
+        },
+        {
+          "text": "noche",
+          "startMs": 13000,
+          "endMs": 14000,
+          "charStart": 3,
+          "charEnd": 8
+        },
+        {
+          "text": "respira",
+          "startMs": 14000,
+          "endMs": 15000,
+          "charStart": 9,
+          "charEnd": 16
+        },
+        {
+          "text": "conmigo",
+          "startMs": 15000,
+          "endMs": 16000,
+          "charStart": 17,
+          "charEnd": 24
+        }
+      ]
+    },
+    {
+      "id": "line-chorus-1",
+      "sectionId": "section-chorus",
+      "startMs": 16000,
+      "endMs": 20000,
+      "text": "Vamos al pulso del viento",
+      "tokens": [
+        {
+          "text": "Vamos",
+          "startMs": 16000,
+          "endMs": 16800,
+          "charStart": 0,
+          "charEnd": 5
+        },
+        {
+          "text": "al",
+          "startMs": 16800,
+          "endMs": 17600,
+          "charStart": 6,
+          "charEnd": 8
+        },
+        {
+          "text": "pulso",
+          "startMs": 17600,
+          "endMs": 18400,
+          "charStart": 9,
+          "charEnd": 14
+        },
+        {
+          "text": "del",
+          "startMs": 18400,
+          "endMs": 19200,
+          "charStart": 15,
+          "charEnd": 18
+        },
+        {
+          "text": "viento",
+          "startMs": 19200,
+          "endMs": 20000,
+          "charStart": 19,
+          "charEnd": 25
+        }
+      ]
+    },
+    {
+      "id": "line-chorus-2",
+      "sectionId": "section-chorus",
+      "startMs": 20000,
+      "endMs": 24000,
+      "text": "Canta la calle al pasar",
+      "tokens": [
+        {
+          "text": "Canta",
+          "startMs": 20000,
+          "endMs": 20800,
+          "charStart": 0,
+          "charEnd": 5
+        },
+        {
+          "text": "la",
+          "startMs": 20800,
+          "endMs": 21600,
+          "charStart": 6,
+          "charEnd": 8
+        },
+        {
+          "text": "calle",
+          "startMs": 21600,
+          "endMs": 22400,
+          "charStart": 9,
+          "charEnd": 14
+        },
+        {
+          "text": "al",
+          "startMs": 22400,
+          "endMs": 23200,
+          "charStart": 15,
+          "charEnd": 17
+        },
+        {
+          "text": "pasar",
+          "startMs": 23200,
+          "endMs": 24000,
+          "charStart": 18,
+          "charEnd": 23
+        }
+      ]
+    },
+    {
+      "id": "line-chorus-3",
+      "sectionId": "section-chorus",
+      "startMs": 24000,
+      "endMs": 28000,
+      "text": "Dejamos el miedo en el suelo",
+      "tokens": [
+        {
+          "text": "Dejamos",
+          "startMs": 24000,
+          "endMs": 24667,
+          "charStart": 0,
+          "charEnd": 7
+        },
+        {
+          "text": "el",
+          "startMs": 24667,
+          "endMs": 25333,
+          "charStart": 8,
+          "charEnd": 10
+        },
+        {
+          "text": "miedo",
+          "startMs": 25333,
+          "endMs": 26000,
+          "charStart": 11,
+          "charEnd": 16
+        },
+        {
+          "text": "en",
+          "startMs": 26000,
+          "endMs": 26667,
+          "charStart": 17,
+          "charEnd": 19
+        },
+        {
+          "text": "el",
+          "startMs": 26667,
+          "endMs": 27333,
+          "charStart": 20,
+          "charEnd": 22
+        },
+        {
+          "text": "suelo",
+          "startMs": 27333,
+          "endMs": 28000,
+          "charStart": 23,
+          "charEnd": 28
+        }
+      ]
+    }
+  ],
+  "chords": [
+    {
+      "id": "chord-01",
+      "startMs": 0,
+      "endMs": 2000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": null,
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-02",
+      "startMs": 2000,
+      "endMs": 4000,
+      "symbol": "Am",
+      "bassNote": null,
+      "anchor": null,
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-03",
+      "startMs": 4000,
+      "endMs": 6000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-1",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-04",
+      "startMs": 6000,
+      "endMs": 8000,
+      "symbol": "G",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-1",
+        "charOffset": 12
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-05",
+      "startMs": 8000,
+      "endMs": 10000,
+      "symbol": "Am",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-2",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-06",
+      "startMs": 10000,
+      "endMs": 12000,
+      "symbol": "F",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-2",
+        "charOffset": 10
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-07",
+      "startMs": 12000,
+      "endMs": 14000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-3",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-08",
+      "startMs": 14000,
+      "endMs": 16000,
+      "symbol": "G",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-verse-3",
+        "charOffset": 9
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-09",
+      "startMs": 16000,
+      "endMs": 18000,
+      "symbol": "F",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-1",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-10",
+      "startMs": 18000,
+      "endMs": 20000,
+      "symbol": "G",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-1",
+        "charOffset": 9
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-11",
+      "startMs": 20000,
+      "endMs": 22000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-2",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-12",
+      "startMs": 22000,
+      "endMs": 24000,
+      "symbol": "Am",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-2",
+        "charOffset": 9
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-13",
+      "startMs": 24000,
+      "endMs": 26000,
+      "symbol": "F",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-3",
+        "charOffset": 0
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-14",
+      "startMs": 26000,
+      "endMs": 28000,
+      "symbol": "G",
+      "bassNote": null,
+      "anchor": {
+        "lineId": "line-chorus-3",
+        "charOffset": 17
+      },
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-15",
+      "startMs": 28000,
+      "endMs": 30000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": null,
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    },
+    {
+      "id": "chord-16",
+      "startMs": 30000,
+      "endMs": 32000,
+      "symbol": "C",
+      "bassNote": null,
+      "anchor": null,
+      "scale": {
+        "root": "C",
+        "id": "ionian"
+      }
+    }
+  ],
+  "tabs": [
+    {
+      "id": "tab-outro",
+      "sectionId": "section-outro",
+      "startMs": 28000,
+      "endMs": 32000,
+      "label": "Cierre de ejemplo · guitarra EADGBE · tablatura estática",
+      "ascii": "e|--------0-------|\nB|------1---1-----|\nG|----0-------0---|\nD|--2-----------2-|\nA|3---------------|\nE|----------------|"
+    }
+  ],
+  "sources": [],
+  "reviewWarnings": [
+    "Temporización estimada por cuadrícula; revisar antes de usar en vivo.",
+    "Los tiempos de las palabras son una demostración uniforme y no se alinearon con audio.",
+    "No hay pista de audio vinculada: reproducir con la base genérica del transporte."
+  ]
+}

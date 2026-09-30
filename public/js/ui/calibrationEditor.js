@@ -25,6 +25,7 @@ import { createTransport } from '../transport/transport.js';
 import { createAudioTrackAdapter, checkAudioCoversRange } from '../transport/audioTrack.js';
 import { createManualAdapter } from '../transport/manual.js';
 import { el } from './dom.js';
+import { showAlert, showToast } from './components/dialogs.js';
 
 const SECTION_TYPES = ['intro', 'verse', 'prechorus', 'chorus', 'bridge', 'solo', 'instrumental', 'outro', 'other'];
 const TIME_SIGNATURE_DENOMINATORS = [1, 2, 4, 8, 16, 32];
@@ -70,8 +71,8 @@ function shiftFrom(song, thresholdMs, deltaMs) {
 }
 
 function addSectionAtEnd(type, label, durationMs) {
-  if (!label || !label.trim()) { alert('Escribí una etiqueta para la sección.'); return; }
-  if (!(durationMs > 0)) { alert('La duración debe ser mayor que 0.'); return; }
+  if (!label || !label.trim()) { showAlert('Dato requerido', 'Escribí una etiqueta para la sección.'); return; }
+  if (!(durationMs > 0)) { showAlert('Duración inválida', 'La duración debe ser mayor que 0.'); return; }
   const startMs = state.song.durationMs;
   state.song.sections.push({ id: newId('section'), type, label: label.trim(), key: null, startMs, endMs: startMs + durationMs });
   state.song.durationMs += durationMs;
@@ -93,8 +94,8 @@ function removeSection(section) {
 }
 
 function addLineToSection(section, text, durationMs) {
-  if (!text || !text.trim()) { alert('Escribí el texto de la nueva línea.'); return; }
-  if (!(durationMs > 0)) { alert('La duración debe ser mayor que 0.'); return; }
+  if (!text || !text.trim()) { showAlert('Dato requerido', 'Escribí el texto de la nueva línea.'); return; }
+  if (!(durationMs > 0)) { showAlert('Duración inválida', 'La duración debe ser mayor que 0.'); return; }
   const insertAt = section.endMs;
   shiftFrom(state.song, insertAt, durationMs);
   section.endMs += durationMs;
@@ -113,7 +114,7 @@ function removeLine(line) {
 
 /** Ocupa el hueco más grande disponible dentro del rango de la línea; no desplaza el resto de la canción. */
 function addChordToLine(line, symbol, durationMs) {
-  if (!symbol || !symbol.trim()) { alert('Escribí el símbolo del acorde.'); return; }
+  if (!symbol || !symbol.trim()) { showAlert('Dato requerido', 'Escribí el símbolo del acorde.'); return; }
   const chordsInRange = state.song.chords
     .filter((c) => c.startMs < line.endMs && c.endMs > line.startMs)
     .sort((a, b) => a.startMs - b.startMs);
@@ -124,7 +125,7 @@ function addChordToLine(line, symbol, durationMs) {
     cursor = Math.max(cursor, c.endMs);
   });
   if (cursor < line.endMs) gaps.push([cursor, line.endMs]);
-  if (gaps.length === 0) { alert('No hay espacio libre en esta línea; ajustá o quitá un acorde existente primero.'); return; }
+  if (gaps.length === 0) { showAlert('No hay espacio disponible', 'Ajustá o quitá un acorde existente primero.'); return; }
   gaps.sort((a, b) => (b[1] - b[0]) - (a[1] - a[0]));
   const [gapStart, gapEndFull] = gaps[0];
   const gapEnd = Math.min(gapEndFull, gapStart + Math.max(1, durationMs));
@@ -227,14 +228,14 @@ async function handlePickFile(file) {
     });
   } catch (err) {
     URL.revokeObjectURL(objectUrl);
-    alert(err.message);
+    await showAlert('No se pudo vincular el audio', err.message);
     return;
   }
   const offsetMs = state.song.audio?.offsetMs ?? 0;
   const check = checkAudioCoversRange(tempAudio, offsetMs, state.song.durationMs);
   URL.revokeObjectURL(objectUrl);
   if (!check.ok) {
-    alert(`El archivo dura ${Math.round(check.fileDurationMs)}ms y hacen falta ${check.requiredMs}ms (offset + duración de la canción). Elegí otro archivo o ajustá el offset.`);
+    await showAlert('El audio no cubre la canción', `El archivo dura ${Math.round(check.fileDurationMs)} ms y hacen falta ${check.requiredMs} ms (offset + duración). Elegí otro archivo o ajustá el offset.`);
     return;
   }
   state.pendingBlob = file;
@@ -254,7 +255,7 @@ async function handlePickFile(file) {
 async function handleSave() {
   const { valid, errors } = validateSongV2(state.song);
   if (!valid) {
-    alert('No se puede guardar: \n' + errors.slice(0, 10).map((e) => `${e.instancePath || '/'}: ${e.message}`).join('\n'));
+    await showAlert('No se puede guardar', errors.slice(0, 10).map((e) => `${e.instancePath || '/'}: ${e.message}`).join('\n'));
     return false;
   }
   if (state.pendingBlob) {
@@ -273,7 +274,7 @@ async function handleSave() {
     await saveSongV2(state.song);
   }
   state.dirty = false;
-  alert('Guardado.');
+  showToast('Canción guardada.', { kind: 'success' });
   render();
   return true;
 }

@@ -34,7 +34,7 @@ function collectShellFiles(publicDir = PUBLIC_DIR) {
     .filter((file) => SHELL_EXTENSIONS.has(path.extname(file)))
     .map((file) => `/${path.relative(publicDir, file).split(path.sep).join('/')}`)
     .sort();
-  return ['/', ...files];
+  return ['/', '/legacy.html', ...files];
 }
 
 function diskPathFor(urlPath, publicDir = PUBLIC_DIR) {
