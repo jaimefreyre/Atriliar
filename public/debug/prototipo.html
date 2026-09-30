@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototipo del rediseño | StagePrompter</title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <style>
+    /* Prototype-only chrome: never part of the real app. */
+    .proto-bar {
+      display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-loop-bg); color: var(--color-text); font-size: var(--text-xs);
+      border-block-end: 1px solid var(--color-loop);
+    }
+    .proto-bar strong { color: var(--color-loop); }
+    .proto-bar select { min-block-size: var(--control-sm); }
+    .proto-fret { inline-size: 100%; block-size: auto; color: var(--color-text-secondary); }
+    .proto-chroma { display: grid; grid-template-columns: repeat(12, 1fr); align-items: end; gap: 3px; block-size: 4.5rem; }
+    .proto-chroma span { background: var(--color-harmony); border-radius: 2px 2px 0 0; block-size: calc(var(--h) * 100%); min-block-size: 2px; opacity: calc(0.35 + var(--h) * 0.65); }
+    .proto-chroma-labels { display: grid; grid-template-columns: repeat(12, 1fr); font-size: 0.625rem; color: var(--color-text-muted); text-align: center; }
+    .proto-stem-lane { display: flex; align-items: center; gap: var(--space-1); }
+    .proto-needle { position: relative; block-size: 0.5rem; background: var(--color-surface-3); border-radius: var(--radius-pill); }
+    .proto-needle::after { content: ""; position: absolute; inset-block: -0.25rem; inline-size: 3px; inset-inline-start: calc(50% + var(--cents) * 1%); background: var(--color-now); border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="proto-bar" role="region" aria-label="Controles del prototipo">
+    <strong>Prototipo del rediseño</strong>
+    <span>Datos de la canción demo · nada se guarda · atajos: <span class="sp-kbd">Espacio</span> reproducir, <span class="sp-kbd">1</span>–<span class="sp-kbd">5</span> modos</span>
+    <label>Estado de ejemplo
+      <select id="proto-state">
+        <option value="normal">Normal</option>
+        <option value="empty">Biblioteca vacía</option>
+        <option value="analyzing">Analizando un audio</option>
+        <option value="separating">Separando pistas</option>
+        <option value="noMic">Sin micrófono</option>
+        <option value="noAudio">Audio faltante</option>
+      </select>
+    </label>
+  </div>
+  <div id="app" class="sp-app"></div>
+  <div class="sp-toast-region" id="toasts" aria-live="polite"></div>
+  <dialog class="sp-dialog" id="separate-dialog" closedby="any" aria-labelledby="separate-title">
+    <form method="dialog">
+      <div class="sp-dialog__body">
+        <h1 id="separate-title">Separar pistas</h1>
+        <p class="sp-muted">La separación corre en tu computadora con Demucs. La primera vez descarga el modelo; una canción de 4 minutos tarda unos minutos.</p>
+        <fieldset class="sp-stack">
+          <legend class="sp-eyebrow">Modelo</legend>
+          <label class="sp-row"><input type="radio" name="model" value="4" checked> 4 pistas: voz, batería, bajo, otros</label>
+          <label class="sp-row"><input type="radio" name="model" value="6"> 6 pistas: suma guitarra y piano (experimental)</label>
+        </fieldset>
+      </div>
+      <div class="sp-dialog__actions">
+        <button class="sp-btn" value="cancel">Cancelar</button>
+        <button class="sp-btn sp-btn--primary" value="separate">Separar</button>
+      </div>
+    </form>
+  </dialog>
+  <script type="module" src="./prototipo.js"></script>
+</body>
+</html>

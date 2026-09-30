@@ -1,12 +1,14 @@
 // @generated-shell-begin (npm run build:shell; no editar a mano)
-const SHELL_CACHE = 'stageprompter-shell-347124c0dc41';
+const SHELL_CACHE = 'stageprompter-shell-2a41d90aba75';
 const SHELL = [
   '/',
   '/css/audio-draft.css',
+  '/css/components.css',
   '/css/evaluator.css',
   '/css/main.css',
   '/css/prompter.css',
   '/css/stage.css',
+  '/css/tokens.css',
   '/fixtures/songs/all-verses.json',
   '/js/app.js',
   '/js/audio/audio-worklet-processor.js',
