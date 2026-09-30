@@ -145,6 +145,10 @@ export async function saveSongV2WithAsset(song, asset) {
 export async function getAsset(id) {
   return runInStore(STORE_ASSETS, 'readonly', s => s.get(id));
 }
+export async function saveAsset(asset) {
+  if (!asset?.id || !(asset.blob instanceof Blob)) throw new TypeError('El asset necesita un id y un Blob.');
+  return runInStore(STORE_ASSETS, 'readwrite', (store) => store.put(asset));
+}
 export async function deleteAsset(id) {
   return runInStore(STORE_ASSETS, 'readwrite', s => s.delete(id));
 }

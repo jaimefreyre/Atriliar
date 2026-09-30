@@ -27,3 +27,12 @@ test('un margen ambiguo no inicia ni confirma un cambio', () => {
   assert.equal(result.proposal, null);
   assert.equal(result.confirmed, null);
 });
+
+test('el detector en vivo confirma un acorde menor séptima con contexto de bajo', () => {
+  const detector = createLiveChordStabilizer({ alpha: 1, minScore: 0.38, minMargin: 0.02, confirmMs: 300 });
+  const cMinor7 = Array(12).fill(0.01);
+  [0, 3, 7, 10].forEach((pitch) => { cMinor7[pitch] = 1; });
+  detector.update(cMinor7, 0, { bassPitchClass: 0, fundamentalPitchClass: 0 });
+  const result = detector.update(cMinor7, 300, { bassPitchClass: 0, fundamentalPitchClass: 0 });
+  assert.equal(result.confirmed.symbol, 'Cm7');
+});

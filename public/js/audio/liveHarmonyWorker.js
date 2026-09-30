@@ -43,7 +43,7 @@ function analyzeWindow(timestampMs) {
   try {
     windowed = essentia.Windowing(vector, true, WINDOW_SIZE, 'hann', 0, true);
     spectrum = essentia.Spectrum(windowed.frame, WINDOW_SIZE);
-    peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.0001, 5000, 100, 55, 'frequency', TARGET_RATE);
+    peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.00002, 5000, 120, 40, 'frequency', TARGET_RATE);
     let pitchHz = 0, pitchConfidence = 0;
     try {
       const pitch = essentia.PitchYinFFT(spectrum.spectrum, WINDOW_SIZE, true, 1600, 45, TARGET_RATE, 1);
@@ -69,7 +69,7 @@ function analyzeWindow(timestampMs) {
     const rawSpectrum = Array.from(essentia.vectorToArray(spectrum.spectrum), Number);
     const spectrumMaximum = Math.max(...rawSpectrum.filter(Number.isFinite), 1e-9);
     const spectrumBins = Array.from({ length: 256 }, (_, index) => {
-      const frequency = 55 * (5000 / 55) ** (index / 255);
+      const frequency = 32.7 * (5000 / 32.7) ** (index / 255);
       const bin = Math.min(rawSpectrum.length - 1, Math.round(frequency * WINDOW_SIZE / TARGET_RATE));
       return Math.sqrt(Math.max(0, rawSpectrum[bin] || 0) / spectrumMaximum);
     });

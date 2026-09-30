@@ -1,4 +1,8 @@
 import { matchChordTemplate } from './chordTemplateMatch.js';
+import { buildHarmonicRegions } from './harmonicSegmentation.js';
+import { buildBeatGrid } from './beatGrid.js';
+import { buildPostBeatWindows } from './beatHarmony.js';
+import { detectSilenceFrames, summarizeSilenceWindow } from './silenceGate.js';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 let instance = null;
@@ -37,26 +41,24 @@ function resampleTo44100(signal, sourceRate) {
   return output;
 }
 
-function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs, bpm) {
-  const beatPeriodSec = 60 / bpm;
-  const beatSeconds = [...detectedBeatSeconds];
-  if (beatSeconds.length && beatSeconds[0] > beatPeriodSec * 0.5 && beatSeconds[0] <= beatPeriodSec * 1.5) {
-    beatSeconds.unshift(Math.max(0, beatSeconds[0] - beatPeriodSec));
-  }
-  if (beatSeconds.length && beatSeconds.at(-1) + beatPeriodSec < durationMs / 1000 + 0.02) {
-    beatSeconds.push(Math.min(durationMs / 1000, beatSeconds.at(-1) + beatPeriodSec));
-  }
+function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs, bpm, rhythmConfidence = 0, detectedOnsets = []) {
+  const beatSeconds = buildBeatGrid(detectedBeatSeconds, durationMs, bpm);
   const frameSize = 4096;
   const hopSize = 2048;
   const chromaFrames = [];
   for (let offset = 0; offset + frameSize <= pcm44100.length; offset += hopSize) {
     const startSec = (offset + frameSize / 2) / 44100;
+    let squareSum = 0;
+    for (let sampleIndex = offset; sampleIndex < offset + frameSize; sampleIndex++) {
+      squareSum += pcm44100[sampleIndex] * pcm44100[sampleIndex];
+    }
+    const rms = Math.sqrt(squareSum / frameSize);
     let frame, windowed, spectrum, peaks, hpcp;
     try {
       frame = essentia.arrayToVector(pcm44100.slice(offset, offset + frameSize));
       windowed = essentia.Windowing(frame, true, frameSize, 'hann', 0, true);
       spectrum = essentia.Spectrum(windowed.frame, frameSize);
-      peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.0001, 5000, 100, 55, 'frequency', 44100);
+      peaks = essentia.SpectralPeaks(spectrum.spectrum, 0.00002, 5000, 120, 40, 'frequency', 44100);
       const peakFrequencies = Array.from(essentia.vectorToArray(peaks.frequencies), Number);
       const peakMagnitudes = Array.from(essentia.vectorToArray(peaks.magnitudes), Number);
       const spectralPeaks = peakFrequencies.flatMap((frequencyHz, index) => {
@@ -73,40 +75,58 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
         const fromA = Array.from(essentia.vectorToArray(hpcp.hpcp), Number);
         chroma = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((index) => fromA[index] || 0);
       }
-      chromaFrames.push({ timeSec: startSec, chroma, spectralPeaks });
+      chromaFrames.push({ timeSec: startSec, chroma, spectralPeaks, rms });
     } catch {
       // One malformed/empty FFT window must not discard the rest of a song.
-      chromaFrames.push({ timeSec: startSec, chroma: Array(12).fill(0), spectralPeaks: [] });
+      chromaFrames.push({ timeSec: startSec, chroma: Array(12).fill(0), spectralPeaks: [], rms });
     } finally {
       hpcp?.hpcp?.delete?.(); peaks?.frequencies?.delete?.(); peaks?.magnitudes?.delete?.();
       spectrum?.spectrum?.delete?.(); windowed?.frame?.delete?.(); frame?.delete?.();
     }
   }
 
+  const silence = detectSilenceFrames(chromaFrames);
+  chromaFrames.forEach((frame, index) => {
+    frame.isSilence = silence.mask[index];
+    if (frame.isSilence) {
+      frame.chroma = Array(12).fill(0);
+      frame.spectralPeaks = [];
+    }
+  });
+
   const events = [];
   const candidates = [];
   // Keep a compact ~4.6 Hz spectral trace so the UI can draw a full-song
   // spectrogram and follow the playhead without retaining every FFT frame.
-  const spectralFrames = chromaFrames.filter((_, frameIndex) => frameIndex % 5 === 0).map((frame) => {
+  const maxRms = chromaFrames.reduce((maximum, frame) => Math.max(maximum, frame.rms || 0), 1e-6);
+  const spectralFrames = chromaFrames.filter((_, frameIndex) => frameIndex % 2 === 0).map((frame) => {
     const maximum = frame.spectralPeaks[0]?.magnitude || 1;
-    return { timeMs: Math.round(frame.timeSec * 1000), peaks: frame.spectralPeaks.slice(0, 12).map((peak) => ({
+    return { timeMs: Math.round(frame.timeSec * 1000), rms: frame.rms || 0, isSilence: frame.isSilence,
+      level: Math.sqrt(Math.max(0, frame.rms || 0) / maxRms), peaks: frame.spectralPeaks.slice(0, 24).map((peak) => ({
       midi: peak.midi, note: peak.note, frequencyHz: Math.round(peak.frequencyHz),
       strength: Math.round(peak.magnitude / maximum * 1000) / 1000,
     })) };
   });
-  for (let index = 0; index + 1 < beatSeconds.length; index++) {
-    const startSec = beatSeconds[index];
-    const endSec = beatSeconds[index + 1];
-    if (!(endSec > startSec)) continue;
-    const frames = chromaFrames.filter((frame) => frame.timeSec >= startSec && frame.timeSec < endSec);
-    if (!frames.length) continue;
-    const chroma = Array.from({ length: 12 }, (_, pitch) =>
-      frames.reduce((sum, frame) => sum + frame.chroma[pitch], 0) / frames.length);
-    const guess = matchChordTemplate(chroma, { minScore: 0.65, minMargin: 0.08 });
+  const beatWindows = buildPostBeatWindows(chromaFrames, beatSeconds, durationMs);
+  for (const window of beatWindows) {
+    const { frames } = window;
+    const silenceWindow = summarizeSilenceWindow(frames);
+    const isSilence = silenceWindow.isSilence;
+    const soundingFrames = silenceWindow.activeFrames;
+    const chroma = isSilence ? Array(12).fill(0) : Array.from({ length: 12 }, (_, pitch) =>
+      soundingFrames.reduce((sum, frame) => sum + frame.chroma[pitch], 0) / soundingFrames.length);
+    const bassEnergyByPitch = new Map();
+    for (const frame of soundingFrames) for (const peak of frame.spectralPeaks) {
+      if (peak.midi >= 55) continue;
+      const pitchClass = ((peak.midi % 12) + 12) % 12;
+      bassEnergyByPitch.set(pitchClass, (bassEnergyByPitch.get(pitchClass) || 0) + peak.magnitude);
+    }
+    const bassGuide = [...bassEnergyByPitch].sort((left, right) => right[1] - left[1])[0]?.[0] ?? null;
+    const guess = matchChordTemplate(chroma, { minScore: 0.43, minMargin: 0.025, bassPitchClass: bassGuide });
     const maxChroma = Math.max(...chroma, 1e-9);
     const normalizedChroma = chroma.map((value) => value / maxChroma);
     const noteEnergy = new Map();
-    for (const frame of frames) for (const peak of frame.spectralPeaks) {
+    for (const frame of soundingFrames) for (const peak of frame.spectralPeaks) {
       const energy = noteEnergy.get(peak.midi) || { ...peak, magnitude: 0 };
       energy.magnitude += peak.magnitude;
       noteEnergy.set(peak.midi, energy);
@@ -114,16 +134,44 @@ function estimateChordEvents(essentia, pcm44100, detectedBeatSeconds, durationMs
     const rankedNotes = [...noteEnergy.values()].sort((a, b) => b.magnitude - a.magnitude);
     const maxMagnitude = rankedNotes[0]?.magnitude || 1;
     const pitches = rankedNotes.map((peak) => ({ ...peak, strength: peak.magnitude / maxMagnitude }));
-    const candidate = { symbol: guess.symbol, startMs: Math.max(0, Math.round(startSec * 1000)),
-      endMs: Math.min(durationMs, Math.round(endSec * 1000)), confidence: guess.score, margin: guess.margin,
-      accepted: guess.accepted, selectedSymbol: '',
-      alternatives: guess.alternatives || [], chroma: normalizedChroma,
-      spectralPeaks: pitches.slice(0, 32), bassPeaks: pitches.filter((peak) => peak.midi < 60).slice(0, 8),
-      highPeaks: pitches.filter((peak) => peak.midi >= 60).slice(0, 8) };
+    const pitchClasses = isSilence ? [] : chroma.map((energy, pitch) => ({ pitch: NOTE_NAMES[pitch], energy }))
+      .sort((left, right) => right.energy - left.energy);
+    const candidateTemplate = guess.alternatives?.[0];
+    const candidateTones = candidateTemplate?.tones || [];
+    const supportedChordTones = candidateTones.filter((pitch) => normalizedChroma[pitch] >= .1);
+    const missingChordTones = candidateTones.filter((pitch) => normalizedChroma[pitch] < .1);
+    const evidence = { method: 'post-beat harmonic reanalysis', beatIndex: window.index + 1,
+      analysisStartMs: window.analysisStartMs, transientSkippedMs: window.transientSkippedMs,
+      analyzedFrames: frames.length, analyzedDurationMs: Math.max(0, Math.round((frames.at(-1).timeSec - frames[0].timeSec) * 1000)),
+      strongestPitchClasses: pitchClasses.slice(0, 5).map((item) => item.pitch),
+      bassNotes: pitches.filter((peak) => peak.midi < 60).slice(0, 4).map((peak) => peak.note),
+      bassGuide: bassGuide === null ? null : NOTE_NAMES[bassGuide], tempoBpm: Number(bpm.toFixed(2)),
+      rhythmConfidence: Number(rhythmConfidence.toFixed(3)),
+      onsetNearBeat: (detectedOnsets || []).some((time) => Math.abs(time * 1000 - window.startMs) <= 100),
+      score: Number(guess.score.toFixed(3)), margin: Number(guess.margin.toFixed(3)),
+      candidateTones: candidateTones.map((pitch) => NOTE_NAMES[pitch]),
+      supportedChordTones: supportedChordTones.map((pitch) => NOTE_NAMES[pitch]),
+      missingChordTones: missingChordTones.map((pitch) => NOTE_NAMES[pitch]),
+      chordCoverage: Number(candidateTemplate?.coverage || 0),
+      supportedToneCount: candidateTemplate?.supportedTones || 0,
+      closeAlternatives: (guess.alternatives || []).slice(0, 3).map(({ symbol, score }) => ({ symbol, score })) };
+    const candidate = { symbol: isSilence ? null : guess.symbol, startMs: window.startMs,
+      endMs: window.endMs, confidence: isSilence ? 0 : guess.score, margin: isSilence ? 0 : guess.margin,
+      accepted: !isSilence && guess.accepted, selectedSymbol: '', isSilence, state: isSilence ? 'silence' : 'harmony',
+      silenceThresholdRms: silence.thresholdRms, rms: frames.reduce((sum, frame) => sum + (frame.rms || 0), 0) / Math.max(1, frames.length),
+      alternatives: isSilence ? [] : guess.alternatives || [], chroma: normalizedChroma,
+      spectralPeaks: isSilence ? [] : pitches.slice(0, 32), bassPeaks: isSilence ? [] : pitches.filter((peak) => peak.midi < 60).slice(0, 8),
+      highPeaks: isSilence ? [] : pitches.filter((peak) => peak.midi >= 60).slice(0, 8),
+      evidence: { ...evidence, isSilence, silentFrames: silenceWindow.silentFrames,
+        activeFrames: soundingFrames.length, silenceRatio: Number(silenceWindow.silenceRatio.toFixed(3)),
+        silenceThresholdRms: silence.thresholdRms }, beatIndex: window.index, analysisStartMs: window.analysisStartMs,
+      transientSkippedMs: window.transientSkippedMs };
     candidates.push(candidate);
     if (guess.accepted) events.push(candidate);
   }
-  return { events, candidates, spectralFrames };
+  const harmonicRegions = buildHarmonicRegions(chromaFrames, durationMs, bpm,
+    { silenceThresholdRms: silence.thresholdRms });
+  return { events, candidates, harmonicRegions, spectralFrames };
 }
 
 self.onmessage = async ({ data }) => {
@@ -151,15 +199,15 @@ self.onmessage = async ({ data }) => {
       } catch (error) {
         self.postMessage({ type: 'warning', message: `OnsetRate no disponible: ${error.message}` });
       }
-      let chordSuggestions = [], chordCandidates = [], spectralFrames = [];
+      let chordSuggestions = [], chordCandidates = [], harmonicRegions = [], spectralFrames = [];
       try {
-        ({ events: chordSuggestions, candidates: chordCandidates, spectralFrames } = estimateChordEvents(essentia, pcm44100, beats,
-          Math.round(pcm44100.length / 44100 * 1000), Number(rhythm.bpm)));
+        ({ events: chordSuggestions, candidates: chordCandidates, harmonicRegions, spectralFrames } = estimateChordEvents(essentia, pcm44100, beats,
+          Math.round(pcm44100.length / 44100 * 1000), Number(rhythm.bpm), Number(rhythm.confidence) || 0, onsets));
       }
       catch (error) { self.postMessage({ type: 'warning', message: `Análisis de acordes no disponible: ${error?.message || String(error)}` }); }
       self.postMessage({ type: 'analysis', version: essentia.version, sampleRate: 44100,
         durationMs: Math.round(pcm44100.length / 44100 * 1000), bpm: Number(rhythm.bpm),
-        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates, spectralFrames });
+        rhythmConfidence: Number(rhythm.confidence) || 0, beats, onsets, onsetRate, chordSuggestions, chordCandidates, harmonicRegions, harmonicSegmentationVersion: 5, spectralFrames });
       rhythm.ticks?.delete?.(); rhythm.bpmIntervals?.delete?.(); rhythm.estimates?.delete?.();
     } finally {
       signal?.delete?.();

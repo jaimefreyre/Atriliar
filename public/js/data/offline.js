@@ -17,7 +17,7 @@ export async function initializeOffline(onStatus = () => {}) {
     return { supported: false };
   }
   try {
-    await navigator.serviceWorker.register('/sw.js');
+    await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
     await navigator.serviceWorker.ready;
     const persisted = await navigator.storage?.persist?.().catch(() => false) ?? false;
     const estimate = await navigator.storage?.estimate?.().catch(() => null) ?? null;

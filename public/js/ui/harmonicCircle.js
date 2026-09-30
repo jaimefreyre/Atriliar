@@ -45,7 +45,7 @@ export function createLiveHarmonicRadar() {
   const chord = makeNode('strong', '', '—');
   const tones = makeNode('span', '', 'Esperando audio'); hub.append(chord, tones);
   wrap.append(hub); element.append(wrap);
-  function update(chroma = [], symbol = '', status = '') {
+  function update(chroma = [], symbol = '', status = '', detectedNote = '') {
     radar.replaceChildren(); ring.replaceChildren(); notes.replaceChildren();
     const center = 110, radius = 67;
     for (const level of [.25, .5, .75, 1]) {
@@ -69,11 +69,13 @@ export function createLiveHarmonicRadar() {
       const label = makeSvg('text', { x, y: y + 4, class: `harmonic-wheel-note${chordData.tones.includes(pc) ? ' is-chord-tone' : ''}`, 'text-anchor': 'middle' });
       label.textContent = NOTES[pc]; ring.append(label);
     });
-    chord.textContent = symbol || '—';
+    chord.textContent = symbol || detectedNote || '—';
     tones.textContent = chordData.recognized
       ? `${status ? `${status} · ` : ''}${chordData.tones.map(pitchClassToSharpName).join(' · ')}`
-      : status || 'Acorde por determinar';
+      : detectedNote ? `${status || 'Nota del micrófono'} · acorde sin confirmar`
+        : status || 'Acorde por determinar';
     element.dataset.hasSignal = String(values.some((value) => value > 0));
+    element.dataset.hasChord = String(Boolean(symbol && chordData.recognized));
   }
   update();
   return { element, update };
@@ -292,7 +294,7 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
     const plotWidth = right - left, plotHeight = bottom - top;
     const duration = Math.max(1, analysis.durationMs || 1);
     const frames = analysis.spectralFrames || [];
-    const parts = analysis.chordCandidates || [];
+    const parts = analysis.harmonicRegions?.length ? analysis.harmonicRegions : analysis.chordCandidates || [];
     const allAudioMidi = frames.flatMap((frame) => (frame.peaks || []).map((peak) => peak.midi))
       .filter((midi) => Number.isFinite(midi));
     const notesByFrame = [];
@@ -404,7 +406,8 @@ export function createHarmonicCircle({ analysis, segment, playbackPositionMs = 0
       }
     }
     if (!best || best.distance > 11) { historyTooltip.hidden = true; historyCanvas.style.cursor = 'crosshair'; return; }
-    const chord = analysis.chordCandidates.find((part) => timeMs >= part.startMs && timeMs < part.endMs);
+    const parts = analysis.harmonicRegions?.length ? analysis.harmonicRegions : analysis.chordCandidates || [];
+    const chord = parts.find((part) => timeMs >= part.startMs && timeMs < part.endMs);
     const strength = Math.round(clamp(best.note.strength, 0, 1) * 100);
     historyTooltip.textContent = `${peakName(best.note)} · ${Math.floor(timeMs / 60000)}:${String(Math.floor(timeMs / 1000) % 60).padStart(2, '0')} · ${chord?.selectedSymbol || chord?.symbol || 'sin acorde'} · intensidad ${strength}%`;
     historyTooltip.style.left = `${Math.min(historyPlot.width - 220, Math.max(4, x + 10))}px`;

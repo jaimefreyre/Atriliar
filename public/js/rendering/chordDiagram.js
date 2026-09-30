@@ -55,7 +55,7 @@ function getPositionStyle(pitchClass, rootPitchClass, bassPitchClass, chordPitch
   return null;
 }
 
-export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined, spectralPitches = []) {
+export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, bassOverride = undefined, spectralPitches = [], options = {}) {
   const { rootPitchClass, bassPitchClass, tones, recognized } = getChordTones(chordStr, bassOverride);
   const stringNames = ['E', 'A', 'D', 'G', 'B', 'E']; // 6ta a 1ra
   const frets = 22;
@@ -135,11 +135,21 @@ export function renderFretboard(container, chordStr, layers = DEFAULT_LAYERS, ba
       const y = (s + 1) * stringGap;
       const label = peak.note || `${pitchClassToSharpName(mod12(midi))}${Math.floor(midi / 12) - 1}`;
       const strength = Math.max(0, Math.min(1, Number(peak.strength) || 0));
-      svg += `<g class="fretboard-spectral-pitch"><title>${label} · pico espectral · ${Math.round(strength * 100)}%</title>`;
-      svg += `<circle cx="${x}" cy="${y}" r="7" fill="#f15acb" stroke="#fff" stroke-width="1.5"/>`;
+      const manual = peak.source === 'manual';
+      svg += `<g class="fretboard-spectral-pitch${manual ? ' is-manual' : ''}" data-midi="${midi}"><title>${label} · ${manual ? 'nota agregada' : 'pico espectral'} · ${Math.round(strength * 100)}%</title>`;
+      svg += `<circle cx="${x}" cy="${y}" r="7" fill="${manual ? '#eff47c' : '#f15acb'}" stroke="#fff" stroke-width="1.5"/>`;
       svg += `<text x="${x}" y="${y + 2.1}" fill="#180d18" font-size="5.6" font-weight="900" text-anchor="middle" font-family="sans-serif">${label}</text></g>`;
     }
   });
+  if (options.interactive) {
+    for (let fret = 0; fret < frets; fret++) for (let string = 0; string < TUNING.length; string++) {
+      const midi = TUNING[string] + fret;
+      const x = (fret + 0.5) * fretWidth;
+      const y = (string + 1) * stringGap;
+      const label = `${pitchClassToSharpName(mod12(midi))}${Math.floor(midi / 12) - 1}`;
+      svg += `<circle class="fretboard-note-target" data-midi="${midi}" cx="${x}" cy="${y}" r="9" tabindex="0" role="button" aria-label="Agregar o quitar ${label} en el cursor"/>`;
+    }
+  }
   svg += `</svg>`;
   container.innerHTML = svg;
 }
