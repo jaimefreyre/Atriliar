@@ -124,7 +124,7 @@ export function openPerformanceEvaluator({ song, transport, onClose = () => {} }
           : 'Señal baja: acércate al micrófono o sube su ganancia.';
       lastDisplayedQuality = frame.quality;
     }
-    if (frame.onset && transport.getSnapshot().state === 'playing') {
+    if (frame.onset && Number.isFinite(frame.observedPerfMs) && transport.getSnapshot().state === 'playing') {
       const snapshot = transport.getSnapshot();
       const framePerfMs = frame.observedPerfMs;
       const captureAgeMs = Math.max(0, performance.now() - framePerfMs);
@@ -185,7 +185,8 @@ export function openPerformanceEvaluator({ song, transport, onClose = () => {} }
   const originalRemove = dialog.remove.bind(dialog);
   dialog.remove = () => { clearInterval(interval); unsubscribe(); originalRemove(); };
   dialog.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') { event.preventDefault(); closeDialog(); return; }
+    // Stop here: the player's own key listener would treat Esc as "exit stage".
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeDialog(); return; }
     if (event.key !== 'Tab') return;
     const enabled = [...buttons].filter((button) => !button.disabled);
     const first = enabled[0]; const last = enabled.at(-1);

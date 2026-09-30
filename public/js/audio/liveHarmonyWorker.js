@@ -100,7 +100,11 @@ self.onmessage = async ({ data }) => {
     }
     if (filled === WINDOW_SIZE && samplesSinceAnalysis >= WINDOW_SIZE) {
       samplesSinceAnalysis = 0;
-      analyzeWindow(data.timestampMs - WINDOW_SIZE / TARGET_RATE * 500);
+      // Window centre on the AudioContext timeline; null (never NaN) if the
+      // capture side did not provide a timestamp.
+      const windowCentreMs = Number.isFinite(data.timestampMs)
+        ? data.timestampMs - WINDOW_SIZE / TARGET_RATE * 500 : null;
+      analyzeWindow(windowCentreMs);
     }
   } catch (error) {
     self.postMessage({ type: 'error', message: error?.message || String(error) });

@@ -239,7 +239,12 @@ async function handlePickFile(file) {
   }
   state.pendingBlob = file;
   state.pendingAssetMeta = { name: file.name, mime: file.type || 'application/octet-stream', bytes: file.size, duration: check.fileDurationMs };
-  if (!state.song.audio) state.song.audio = { assetId: `asset-${state.song.id}`, offsetMs: 0 };
+  // Always a fresh asset id: the previous asset may be shared with a lab
+  // project, and saving under its id would silently swap that project's audio.
+  state.song.audio = {
+    assetId: `asset-${state.song.id}-${Date.now().toString(36)}`,
+    offsetMs: state.song.audio?.offsetMs ?? 0,
+  };
   state.dirty = true;
   await mountTransport();
   render();

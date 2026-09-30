@@ -1233,7 +1233,10 @@ export function createMultitrackWorkspace({
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('Este navegador no permite grabar audio localmente.');
       loopStatus.textContent = 'Solicitando permiso de micrófono…';
-      recordedStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Voice processing (echo cancel, noise suppression, auto gain) degrades music takes.
+      recordedStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false,
+      });
       if (loop.loopEnabled && loop.loopEndMs > loop.loopStartMs) {
         if (playbackClock) pauseLooper();
         playbackPositionMs = loop.loopStartMs;

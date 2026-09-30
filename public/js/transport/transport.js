@@ -76,12 +76,15 @@ export function createTransport({ mode, durationMs, adapter }) {
     rafHandle = requestAnimationFrame(tick);
   }
 
+  // A media adapter's now() reports the element's own position, which its
+  // onPlay/onSeek hooks move. Re-anchor only after the adapter repositioned,
+  // otherwise the stale position leaks into positionMs().
   function play() {
     if (disposed || state === 'playing') return;
     if (state === 'ended') anchorSongMs = 0;
-    anchorClockMs = adapter.now();
     state = 'playing';
     adapter.onPlay?.(anchorSongMs, rate);
+    anchorClockMs = adapter.now();
     notify();
     rafHandle = requestAnimationFrame(tick);
   }
@@ -100,9 +103,10 @@ export function createTransport({ mode, durationMs, adapter }) {
     if (disposed) return;
     cancelRaf();
     anchorSongMs = 0;
-    anchorClockMs = adapter.now();
     state = 'ready';
     adapter.onPause?.();
+    adapter.onSeek?.(0);
+    anchorClockMs = adapter.now();
     notify();
   }
 
@@ -110,9 +114,9 @@ export function createTransport({ mode, durationMs, adapter }) {
     if (disposed) return;
     const target = clamp(Math.round(ms), 0, durationMs);
     anchorSongMs = target;
-    anchorClockMs = adapter.now();
     if (state === 'ended' && target < durationMs) state = 'paused';
     adapter.onSeek?.(target);
+    anchorClockMs = adapter.now();
     notify();
   }
 

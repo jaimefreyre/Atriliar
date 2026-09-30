@@ -26,7 +26,8 @@ self.onmessage = ({ data }) => {
   }
   const rms = Math.sqrt(sumSquares / Math.max(1, samples.length));
   const clipRatio = clipped / Math.max(1, samples.length);
-  const timestampMs = (currentFrame + samples.length) / sampleRate * 1000;
+  const timestampMs = Number.isFinite(data.timestampMs)
+    ? data.timestampMs : (currentFrame + samples.length) / sampleRate * 1000;
   const rising = rms >= Math.max(0.018, noiseFloor * 2.4) && rms >= Math.max(0.009, previousRms * 1.75);
   const onset = rising && timestampMs - lastOnsetMs >= 120;
   if (onset) lastOnsetMs = timestampMs;

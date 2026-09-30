@@ -149,6 +149,85 @@ test('cien ciclos de play/pause/seek no acumulan llamadas de más al adapter', (
   assert.equal(calls.onDispose, 1);
 });
 
+// Como audioTrack.js: now() devuelve la posición del propio elemento, que
+// onPlay/onSeek mueven. El reloj falso de arriba corre libre y no detecta
+// errores de orden entre "re-anclar" y "reposicionar el medio".
+function createFakeMediaAdapter() {
+  let mediaMs = 0;
+  let playing = false;
+  const adapter = {
+    now: () => mediaMs,
+    rate: 1,
+    supportsRateChange: false,
+    onPlay: (fromSongMs) => { mediaMs = fromSongMs; playing = true; },
+    onPause: () => { playing = false; },
+    onSeek: (ms) => { mediaMs = ms; },
+    onDispose: () => { playing = false; },
+  };
+  return { adapter, advance: (ms) => { if (playing) mediaMs += ms; } };
+}
+
+// Si una aserción falla antes del dispose(), el tick loop sigue
+// reprogramándose con el polyfill de rAF y la suite nunca termina.
+function mediaTransport(ctx, durationMs) {
+  const { adapter, advance } = createFakeMediaAdapter();
+  const transport = createTransport({ mode: 'audio', durationMs, adapter });
+  ctx.after(() => transport.dispose());
+  return { t: transport, advance };
+}
+
+test('audio real: buscar durante la reproducción queda exacto hacia atrás y hacia adelante', (ctx) => {
+  const { t, advance } = mediaTransport(ctx, 120000);
+  t.play();
+  advance(30000);
+  assert.equal(t.getSnapshot().positionMs, 30000);
+  t.seek(10000);
+  assert.equal(t.getSnapshot().positionMs, 10000);
+  advance(5000);
+  assert.equal(t.getSnapshot().positionMs, 15000);
+  t.seek(60000);
+  assert.equal(t.getSnapshot().positionMs, 60000);
+  advance(1000);
+  assert.equal(t.getSnapshot().positionMs, 61000);
+});
+
+test('audio real: detener y volver a reproducir arranca en 0 sin atraso', (ctx) => {
+  const { t, advance } = mediaTransport(ctx, 120000);
+  t.play();
+  advance(30000);
+  t.stop();
+  assert.equal(t.getSnapshot().positionMs, 0);
+  t.play();
+  assert.equal(t.getSnapshot().positionMs, 0);
+  advance(2000);
+  assert.equal(t.getSnapshot().positionMs, 2000);
+});
+
+test('audio real: buscar en pausa y reanudar continúa desde el destino', (ctx) => {
+  const { t, advance } = mediaTransport(ctx, 120000);
+  t.play();
+  advance(5000);
+  t.pause();
+  assert.equal(t.getSnapshot().positionMs, 5000);
+  t.seek(20000);
+  assert.equal(t.getSnapshot().positionMs, 20000);
+  t.play();
+  advance(1000);
+  assert.equal(t.getSnapshot().positionMs, 21000);
+});
+
+test('audio real: tras llegar al final, play vuelve a empezar desde 0', async (ctx) => {
+  const { t, advance } = mediaTransport(ctx, 100);
+  t.play();
+  advance(500);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(t.getSnapshot().state, 'ended');
+  t.play();
+  assert.equal(t.getSnapshot().positionMs, 0);
+  advance(50);
+  assert.equal(t.getSnapshot().positionMs, 50);
+});
+
 test('modo manual (rate 0): la posición nunca avanza sola, solo por seek', async () => {
   const { createManualAdapter } = await import('../../public/js/transport/manual.js');
   const t = createTransport({ mode: 'manual', durationMs: 20000, adapter: createManualAdapter() });

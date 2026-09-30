@@ -14,6 +14,13 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
   let harmonyWorker = null;
   let disposed = false;
 
+  // Worklet timestamps live on the AudioContext timeline; convert them to the
+  // performance.now() clock the UI uses. Null when the frame has none.
+  function observedPerfMsFor(timestampMs) {
+    if (!Number.isFinite(timestampMs) || !context) return null;
+    return performance.now() - Math.max(0, context.currentTime * 1000 - timestampMs);
+  }
+
   async function start() {
     if (disposed) throw new Error('La captura ya fue cerrada.');
     if (stream) return;
@@ -34,8 +41,7 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
       worker = new Worker(new URL('./onsetWorker.js', import.meta.url), { type: 'module' });
       worker.onmessage = ({ data }) => {
         if (data.type !== 'frame') return;
-        const captureTimeSec = data.timestampMs / 1000;
-        data.observedPerfMs = performance.now() - Math.max(0, context.currentTime - captureTimeSec) * 1000;
+        data.observedPerfMs = observedPerfMsFor(data.timestampMs);
         onFrame(data);
       };
       worker.onerror = (event) => onStatus({ state: 'error', message: event.message || 'Falló el analizador de señal.' });
@@ -46,10 +52,7 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
           harmonyWorker.onmessage = ({ data }) => {
             if (data.type === 'ready') { clearTimeout(timeout); resolve(); return; }
             if (data.type === 'error') { clearTimeout(timeout); reject(new Error(data.message)); return; }
-            if (data.type === 'harmony') {
-              const captureAgeMs = Math.max(0, context.currentTime * 1000 - data.timestampMs);
-              onHarmony({ ...data, observedPerfMs: performance.now() - captureAgeMs });
-            }
+            if (data.type === 'harmony') onHarmony({ ...data, observedPerfMs: observedPerfMsFor(data.timestampMs) });
           };
           harmonyWorker.onerror = (event) => { clearTimeout(timeout); reject(new Error(event.message || 'Falló el análisis armónico.')); };
           harmonyWorker.postMessage({ type: 'init' });

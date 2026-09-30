@@ -81,11 +81,14 @@ function renderTransportControls() {
     className: 'btn-tiny', onclick: () => togglePanel('tabVisible'),
   }, ['≋ Tablatura']));
   fineControls.appendChild(el('button', {
-    className: 'btn-tiny', id: 'player-evaluate', onclick: () => openPerformanceEvaluator({
-      song: current.song,
-      transport: current.transport,
-      onClose: () => document.getElementById('player-evaluate')?.focus(),
-    }),
+    className: 'btn-tiny', id: 'player-evaluate', onclick: () => {
+      const handle = openPerformanceEvaluator({
+        song: current.song,
+        transport: current.transport,
+        onClose: () => document.getElementById('player-evaluate')?.focus(),
+      });
+      if (handle) current.evaluator = handle;
+    },
   }, ['🎙 Evaluar ritmo']));
   const isFullscreen = document.fullscreenElement === document.getElementById('player-view');
   fineControls.appendChild(el('button', {
@@ -342,6 +345,9 @@ export async function openPlayerView(song, onClose) {
 }
 
 function close() {
+  // Clearing the container below removes the evaluator's DOM but not its
+  // timer, transport subscription or microphone; close it explicitly first.
+  current?.evaluator?.close();
   current?.transport?.dispose();
   current?.inputListener?.dispose();
   document.removeEventListener('fullscreenchange', onFullscreenChange);

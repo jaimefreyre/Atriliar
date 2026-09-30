@@ -204,13 +204,15 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     liveToolControls.append(button);
   }
   const liveActions = el('footer', { className: 'audio-draft-actions live-actions' });
-  const keyboardHint = el('p', { className: 'live-shortcuts' }, 'Atajos: M micrófono · Espacio play/pausa en Loopera · 1 Autopsia · 2 Karaoke · 3 Multipista · 4 Loopera · R cotejo');
+  const keyboardHint = el('p', { className: 'live-shortcuts' }, 'Atajos: Espacio reproducir/pausar · M micrófono · R cotejo (en Loopera: grabar capa) · 1 Autopsia · 2 Karaoke · 3 Multipista · 4 Loopera');
   liveActions.append(micSwitchLabel, keyboardHint);
   const referenceToggle = el('label', { className: 'live-reference-toggle' });
   const referencePreferenceKey = 'stageprompter:mic-reference:v1';
   let referenceEnabled = true;
   try { referenceEnabled = localStorage.getItem(referencePreferenceKey) !== 'false'; } catch { /* storage may be disabled */ }
-  const referenceCheckbox = el('input', { type: 'checkbox', checked: String(referenceEnabled) });
+  // `checked` must be set as a property: the attribute checked="false" still ticks the box.
+  const referenceCheckbox = el('input', { type: 'checkbox' });
+  referenceCheckbox.checked = referenceEnabled;
   referenceToggle.append(referenceCheckbox, el('span', {}, 'Comparar el micrófono con el audio cargado'));
   const analyze = el('button', { type: 'button', className: 'btn-primary' }, 'Analizar archivo');
   const create = el('button', { type: 'button', className: 'btn-primary', disabled: 'true' }, 'Crear canción editable');
@@ -1067,10 +1069,13 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     else if (key === '2') setWorkspaceMode('karaoke');
     else if (key === '3') setWorkspaceMode('stems');
     else if (key === '4') setWorkspaceMode('looper');
-    else if (key === 'r') { referenceCheckbox.checked = !referenceCheckbox.checked; referenceCheckbox.dispatchEvent(new Event('change', { bubbles: true })); }
-    else if (event.code === 'Space' && workspace.dataset.workspace === 'looper') {
+    else if (key === 'r' && workspace.dataset.workspace === 'looper') {
       event.preventDefault();
       if (!event.repeat) multitrackView.toggleRecording();
+    } else if (key === 'r') { referenceCheckbox.checked = !referenceCheckbox.checked; referenceCheckbox.dispatchEvent(new Event('change', { bubbles: true })); }
+    else if (event.code === 'Space' && workspace.dataset.workspace === 'looper') {
+      event.preventDefault();
+      if (!event.repeat) multitrackView.togglePlay();
     } else if (key === 'p' && workspace.dataset.workspace === 'looper') {
       event.preventDefault(); multitrackView.togglePlay();
     } else if (event.key === 'Escape' && workspace.dataset.workspace === 'looper') {

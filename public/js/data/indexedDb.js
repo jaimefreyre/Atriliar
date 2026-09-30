@@ -19,41 +19,55 @@ function notifyDbEvent(kind, message) {
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-      // Solo crea stores acá; nunca migra datos dentro de onupgradeneeded.
-      // Idempotente para oldVersion 0 (DB nueva) y 1 (solo tenía 'songs').
-      request.onupgradeneeded = (e) => {
-        const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_SONGS)) db.createObjectStore(STORE_SONGS, { keyPath: 'id' });
-        if (!db.objectStoreNames.contains(STORE_SONGS_V2)) db.createObjectStore(STORE_SONGS_V2, { keyPath: 'id' });
-        if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: 'id' });
-        if (!db.objectStoreNames.contains(STORE_SETLISTS)) db.createObjectStore(STORE_SETLISTS, { keyPath: 'id' });
-        if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
-        if (!db.objectStoreNames.contains(STORE_LAB_PROJECTS)) db.createObjectStore(STORE_LAB_PROJECTS, { keyPath: 'id' });
-      };
-
-      request.onsuccess = (e) => {
-        const db = e.target.result;
-        // Otra pestaña quiere subir de versión: cerrar acá para no bloquearla.
-        db.onversionchange = () => {
-          db.close();
-          dbPromise = null;
-          notifyDbEvent('versionchange', 'La base de datos cambió en otra pestaña. Recargá esta página antes de guardar algo más.');
-        };
-        resolve(db);
-      };
-
-      request.onerror = (e) => reject(e.target.error);
-
-      // Otra pestaña con una conexión vieja abierta impide la actualización.
-      request.onblocked = () => {
-        notifyDbEvent('blocked', 'Cerrá las otras pestañas de StagePrompter para poder actualizar la base de datos.');
-      };
+    dbPromise = openDatabase(DB_VERSION).catch((error) => {
+      // A newer build already upgraded the database. Stores are only ever
+      // added, so opening it at its current version keeps this build working
+      // (e.g. after rolling back) instead of failing to load at all.
+      if (error?.name !== 'VersionError') throw error;
+      console.warn('[IndexedDB] La base tiene una versión más nueva; se abre sin actualizar.');
+      return openDatabase(undefined);
+    }).catch((error) => {
+      dbPromise = null; // permitir reintentar en la próxima llamada
+      throw error;
     });
   }
   return dbPromise;
+}
+
+function openDatabase(version) {
+  return new Promise((resolve, reject) => {
+    const request = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
+
+    // Solo crea stores acá; nunca migra datos dentro de onupgradeneeded.
+    // Idempotente para oldVersion 0 (DB nueva) y 1 (solo tenía 'songs').
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_SONGS)) db.createObjectStore(STORE_SONGS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_SONGS_V2)) db.createObjectStore(STORE_SONGS_V2, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_SETLISTS)) db.createObjectStore(STORE_SETLISTS, { keyPath: 'id' });
+      if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(STORE_LAB_PROJECTS)) db.createObjectStore(STORE_LAB_PROJECTS, { keyPath: 'id' });
+    };
+
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      // Otra pestaña quiere subir de versión: cerrar acá para no bloquearla.
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+        notifyDbEvent('versionchange', 'La base de datos cambió en otra pestaña. Recargá esta página antes de guardar algo más.');
+      };
+      resolve(db);
+    };
+
+    request.onerror = (e) => reject(e.target.error);
+
+    // Otra pestaña con una conexión vieja abierta impide la actualización.
+    request.onblocked = () => {
+      notifyDbEvent('blocked', 'Cerrá las otras pestañas de StagePrompter para poder actualizar la base de datos.');
+    };
+  });
 }
 
 /**

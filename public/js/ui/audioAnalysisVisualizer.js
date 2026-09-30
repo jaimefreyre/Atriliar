@@ -1115,6 +1115,12 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   return { element: root, waveformCanvas, historyElement: harmonicHistoryHost, redraw: drawOverview, refreshPanels: applyPanelState, getSelectedSegments: getSegments, focusChordSelect: () => activeChordSelect?.focus(),
     setPlaybackPosition, setLiveFrame, setAuditionStatus, selectSegmentAt, moveSelection, refreshDetail: renderDetail,
-    dispose: () => { stopMidiPlayback(); resizeObserver?.disconnect(); harmonicVisualization?.dispose(); harmonicHistoryHost.replaceChildren(); circleWidgetHost.replaceChildren(); },
+    dispose: () => {
+      stopMidiPlayback(); resizeObserver?.disconnect(); harmonicVisualization?.dispose();
+      harmonicHistoryHost.replaceChildren(); circleWidgetHost.replaceChildren();
+      // Each re-analysis builds a new visualizer; without this its AudioContext leaked.
+      midiAudioContext?.close().catch(() => {});
+      midiAudioContext = null; midiMasterGain = null; midiCompressor = null; midiEqFilters = null;
+    },
     getSelectedSegment: () => getSegments()[selectedIndex] || null };
 }

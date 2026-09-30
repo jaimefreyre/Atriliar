@@ -6,6 +6,7 @@
     "start": "node server.js",
     "test": "node --test tests/",
     "build:validator": "node scripts/build-validator.cjs",
+    "build:shell": "node scripts/build-shell-manifest.cjs",
     "vendor:essentia": "node scripts/vendor-essentia.cjs"
   },
   "devDependencies": {
