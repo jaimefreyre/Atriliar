@@ -69,15 +69,25 @@ Invoke-RestMethod http://localhost:3000/health
 Invoke-RestMethod http://localhost:3000/api/separation/status
 ~~~
 
-La primera respuesta debe indicar estado ok. Si Python y Demucs están disponibles, la segunda debe incluir available: true y “Demucs listo para separar en este equipo”. También puedes ejecutar npm test desde la carpeta del proyecto para validar la suite de pruebas.
+La primera respuesta debe indicar estado ok. Si Python y Demucs están disponibles, la segunda debe incluir available: true y “Demucs listo para separar en este equipo”.
+
+Desde la carpeta del proyecto también puedes validar el código:
+
+~~~powershell
+npm test               # suite completa (≈ 10 s)
+npm run eval:harmony   # banco del reconocedor de acordes contra su línea base (≈ 1 min)
+~~~
+
+Ambos deben terminar sin fallas. El segundo imprime, por progresión y por sensibilidad, los aciertos y cuánto "cambia de más" o "no detecta" el motor (ver sección 7).
 
 ## 5. Recorrido inicial
 
 1. Abre el proyecto en localhost y entra al **Laboratorio del sonido**.
 2. En **Fuente y proyecto**, selecciona un audio o video compatible, completa título y artista si quieres, y pulsa **Analizar archivo**.
-3. Espera a que termine el análisis. El BPM sugerido se puede corregir.
-4. Usa los cuatro espacios de trabajo: **Autopsia del audio**, **Karaoke y escucha en vivo**, **Autopsia multipista** y **Loopera**.
-5. Guarda con **Guardar laboratorio**. **Crear canción editable** convierte el borrador del laboratorio en una canción que puedes revisar en **Escritura y calibración** y abrir en **Escenario**.
+3. Espera a que termine el análisis; el estado muestra el avance (tempo y pulsos → picos espectrales → armonía). Una canción de 5 minutos tarda alrededor de medio minuto. El BPM sugerido se puede corregir.
+4. Revisa los acordes en **Autopsia del audio**: elige la **Sensibilidad de cambios**, escucha cada tramo y confirma o corrige los que no suenen bien.
+5. Usa los otros espacios de trabajo: **Karaoke y escucha en vivo**, **Autopsia multipista** y **Loopera**.
+6. Guarda con **Guardar laboratorio**. **Crear canción editable** convierte el laboratorio en una canción con **todos** los acordes: los que confirmaste y los automáticos, que quedan marcados como estimados. Revísala en **Escritura y calibración** y ábrela en **Escenario**.
 
 El campo de archivo del navegador se vacía al recargar la página. Vuelve a seleccionar el archivo para usar acciones que necesitan el archivo original, como iniciar una nueva separación.
 
@@ -88,9 +98,23 @@ El campo de archivo del navegador se vacía al recargar la página. Vuelve a sel
 Es la vista principal para explorar la mezcla completa.
 
 - La pista y su reproductor comparten una posición temporal con el mapa y los tramos.
-- El mapa global puede mostrar datos como croma/armonía y constelaciones de alturas. La resolución por pulsos guarda observaciones breves para estudiar melodías; los tramos armónicos agrupan cambios sostenidos para estudiar acordes.
-- Selecciona un tramo para escucharlo y ver sus propuestas, picos espectrales, perfiles de notas y visualizaciones relacionadas.
-- La huella de croma coteja en los mismos ejes la energía medida y las notas esperadas de un acorde elegido. El acorde sugerido es una hipótesis con confianza orientativa, no una transcripción confirmada.
+- El mapa global puede mostrar datos como croma/armonía y constelaciones de alturas.
+- **Una sola pista de acordes.** La lista de tramos es la respuesta del reconocedor. En la lista, `¿C?` es un acorde automático sin confirmar y `✓ C` es uno que decidiste vos.
+- **Sensibilidad de cambios** define cuántos cambios de acorde se muestran:
+  - **Estable:** a lo sumo un cambio por compás, sin colores ni bajos.
+  - **Normal:** la recomendada; cambios de 2 pulsos, séptimas y otros colores si se sostienen, y slash (Am/G) si el bajo se sostiene.
+  - **Detallada:** cambios de 1 pulso y colores más cortos.
+
+  Cambiar la sensibilidad recalcula al instante y **nunca pisa lo que corregiste**.
+- **Corregir un acorde.** Selecciona el tramo y usa **Acorde para estudiar / usar en el borrador**:
+  - **Confirmar X** acepta la propuesta del motor.
+  - **Otras lecturas** son otras raíces, colores o acordes con las mismas notas.
+  - **Elegir manualmente** muestra el catálogo completo.
+  - **— Automático (sin confirmar) —** borra tu decisión.
+- **Evidencia por golpe (solo lectura)** muestra qué sonó en cada pulso (croma, picos, bajo) junto al acorde de la pista. Sirve para entender una decisión; el acorde se corrige en el tramo.
+- La tarjeta del tramo indica la confianza, cuánto se sostiene la nota de color, qué tan fiable es el bajo y la fuerza del cambio. Con confianza baja aparece "Propuesta cercana": escucha y corrige.
+- La huella de croma coteja en los mismos ejes la energía medida y las notas esperadas del acorde.
+- **Laboratorios guardados con la versión anterior.** Al abrirlos, tus acordes elegidos, por tramo **y** por golpe, se conservan como decisiones. El resto se reconstruye en forma provisoria y el estado dice "Acordes convertidos del motor anterior". Pulsa **Analizar archivo** para usar el motor nuevo: tus acordes se mantienen.
 - El inspector puede mostrar posiciones teóricas en guitarra, bajo o piano, notas estimadas y tablatura escrita. El diapasón no afirma que el audio se haya separado por instrumento; representa posiciones posibles para tocar.
 - La estructura editable permite dividir una sección en el cursor y añadir tipo, nombre, letra y tablatura ASCII. Las ediciones se guardan en el proyecto local.
 
@@ -103,6 +127,8 @@ Usa el micrófono para comparar una interpretación o un instrumento con la pist
 - Activa el micrófono desde el control de escucha. El navegador pedirá permiso; localhost se trata como origen local seguro en los navegadores compatibles.
 - **Comparar el micrófono con el audio cargado** activa o desactiva la referencia a la pista.
 - El afinador muestra la nota individual estimada, su registro y la desviación en cents.
+- **Acorde en vivo.** Se usa el mismo reconocedor que en Autopsia, con la sensibilidad elegida allí. Un cambio aparece unos 0,3–0,6 s después de tocarlo en Normal. Los colores (7, maj7…) aparecen solo si los sostenés alrededor de un segundo. En vivo no se nombran slash: Am/G se muestra como Am7, con las mismas notas.
+- **Cotejo.** Con la comparación activada, dice si estás tocando el acorde que la pista tiene en ese momento: **coincide**, **parcial · sin G** (falta una nota del acorde) o **no coincide · suena como Am**. Mientras decide muestra "verificando".
 - El espectro muestra energía por frecuencia, picos estimados y una huella de nota/acorde cercano. El radar/círculo muestra evidencia tonal y candidatos armónicos.
 - Los botones Referencia, Cambio, Acorde, Afinidad, Cotejo, Radar, Afinador y Espectro permiten mostrar u ocultar paneles. La selección queda guardada en este navegador.
 
@@ -144,26 +170,61 @@ Los timbres MIDI Guitarra*, Piano*, Seno y Cuadrada son síntesis básica del na
 
 Se habilita al crear una canción editable desde el laboratorio. Permite revisar el documento musical: metadatos, BPM/compás, secciones, letra, acordes, digitaciones y tablatura. Los controles de calibración permiten ajustar la interpretación temporal y reproducir el material vinculado.
 
+Una canción creada desde el audio muestra el aviso "N de M acordes son estimados automáticamente y no están confirmados". Revísalos escuchando la pista antes de declarar la canción revisada. Los acordes slash llegan con su nota de bajo cargada.
+
 ### Escenario
 
 Es la vista de ejecución de una canción editable: transporte de reproducción, búsqueda temporal, letra/acordes con avance, ajuste del tamaño de texto y transposición, paneles de diapasón y tablatura, pantalla completa y evaluación rítmica por micrófono.
 
 La vista de escenario actual trabaja con una canción. El setlist de varias canciones todavía está pendiente.
 
-## 7. Atajos de teclado
+## 7. Probar el reconocedor de acordes
+
+### Con tus canciones reales (recomendado)
+
+El banco sintético ya está casi perfecto, así que lo que falta medir es cómo le va con tu música. Con el servidor arrancado:
+
+1. Abre [http://localhost:3000/debug/harmony-eval.html](http://localhost:3000/debug/harmony-eval.html).
+2. Elige una fuente:
+   - **Canción de la biblioteca:** una canción que tenga audio vinculado y un cifrado que ya revisaste. El cifrado es la respuesta correcta.
+   - **Archivo de audio + referencia:** un audio y su anotación en formato `.lab`, con líneas `inicio fin acorde` en segundos y acordes como `C:maj`, `A:min7`, `G:7/3` o `N`, que es el formato de los datasets públicos. También se acepta un cifrado JSON v2 exportado.
+3. Deja marcado **Evaluar solo el tramo que cubre la referencia** si el cifrado no cubre toda la grabación.
+4. Pulsa **Analizar y comparar**. Se usa el mismo analizador que el laboratorio.
+5. Lee el resultado:
+   - **Tabla por sensibilidad:**
+     - *Mayor/menor* son los aciertos de familia. *Con inversión* y *Séptimas* son más exigentes.
+     - *Sobresegm.* baja cuando el motor "cambia muchísimo". *Subsegm.* baja cuando "no detecta cambios".
+     - *F1 límites* dice si los cambios caen donde deben.
+     - *Cambios/min* compara el motor contra la referencia.
+     - En todas, 1 es perfecto.
+   - **Línea de tiempo:** referencia arriba y cada sensibilidad debajo. Verde coincide y rojo no.
+   - **Dónde no coincide:** los tramos más largos donde falla, con el acorde de la referencia y el del motor.
+6. **Descargar reporte JSON** guarda el resultado en tu equipo. Si me lo pasás, sirve para ajustar el motor con tu música.
+
+El audio y los resultados no salen de la computadora.
+
+### Pruebas automáticas
+
+- `npm run eval:harmony`: 15 progresiones sintéticas (pop, pedal, bajo caminante, bajo descendente, séptimas, silencios, desafinadas, con melodía, con batería, rubato, power chords…). Falla si alguna métrica baja respecto de `tests/harmony/harmony-baseline.json`.
+- `node scripts/eval-harmony.mjs --verbose`: muestra la respuesta correcta y la del motor para cada progresión.
+- `node scripts/eval-harmony.mjs --engines v6,essentia-cdb`: compara el motor contra el detector de acordes de Essentia.
+- `node scripts/eval-harmony.mjs --oracle`: comprueba que el cálculo de croma coincide con el de Essentia (≈ 1 min).
+- La comparación contra el motor anterior quedó registrada en `docs/rediseno/E1-comparacion-motores.json` y se resume en `docs/rediseno/E1-EVIDENCIA.md`.
+
+## 8. Atajos de teclado
 
 - M: activar o apagar el micrófono.
 - 1: Autopsia del audio.
 - 2: Karaoke y escucha en vivo.
 - 3: Autopsia multipista.
 - 4: Loopera.
-- R: activar o desactivar la comparación entre micrófono y audio.
+- R: activar o desactivar la comparación entre micrófono y audio; en la Loopera, grabar una capa.
 - Flechas izquierda/derecha: tramo anterior o siguiente en Autopsia.
 - Barra espaciadora: reproducir/pausar la Loopera cuando esa vista está activa; en otras vistas controla el reproductor principal.
 
 Los atajos no actúan mientras escribes en un campo o control de texto.
 
-## 8. Arquitectura y flujo de datos
+## 9. Arquitectura y flujo de datos
 
 ~~~mermaid
 flowchart LR
@@ -180,17 +241,18 @@ flowchart LR
 
 - Node sirve los archivos de la SPA y las rutas /api/separation/status, /api/separate, /api/separate/:id y /api/stems/:id/:name.
 - El script de Python comprueba dependencias o ejecuta python -m demucs. Node pasa la ruta del intérprete por STAGEPROMPTER_PYTHON; si no se define, busca python en Windows y python3 en otros sistemas.
-- Essentia.js y los módulos de análisis JavaScript corren en el navegador. La inspección de stems también vuelve a usar el worker de análisis del navegador.
+- El análisis corre en un Worker del navegador (public/js/audio/analysisPipeline.js): Essentia.js estima tempo y pulsos, y el reconocedor de acordes propio en JavaScript (public/js/harmony/) calcula la croma NNLS y decodifica la pista armónica por pulsos. La inspección de stems usa el mismo Worker.
+- La pista armónica guarda sus datos de análisis comprimidos y tus decisiones como restricciones: por eso cambiar la sensibilidad no necesita volver a analizar el audio y nunca borra tus correcciones.
 - IndexedDB conserva canciones, proyectos, estados y blobs de audio en el origen local del navegador. Los datos de localhost:3000 son distintos de los de otro puerto, navegador o computadora.
 - Los pesos de Demucs se descargan una vez; los WAV separados se procesan localmente y se guardan en el laboratorio.
 
-## 9. Guardado, respaldo y privacidad
+## 10. Guardado, respaldo y privacidad
 
 Los datos se guardan en IndexedDB del navegador y del origen actual. Si borras los datos del sitio, cambias de puerto/navegador o mueves el proyecto a otro equipo, el contenido local no se transfiere automáticamente. El respaldo de canciones JSON actual no incluye los audios ni todos los proyectos del laboratorio. Exportar/importar un paquete completo de proyecto con medios es una mejora pendiente.
 
 La app no sube el micrófono ni el audio a un servicio remoto. La única descarga de red asociada a la separación es la del modelo cuando todavía no está en caché. El servidor guarda temporalmente el original recibido y la salida Demucs bajo la carpeta temporal del sistema; los stems que se usan en el laboratorio se descargan luego al navegador.
 
-## 10. Problemas frecuentes
+## 11. Problemas frecuentes
 
 **“El separador local no está disponible”**
 
@@ -214,14 +276,28 @@ La app no sube el micrófono ni el audio a un servicio remoto. La única descarg
 
 - La salida Demucs es una estimación, no stems perfectos. En una mezcla, los ataques, armónicos, reverberación y filtraciones cambian la evidencia.
 - El acorde mostrado es una propuesta del analizador, no una transcripción garantizada. Escucha el tramo y compara la pista original con bajo, guitarra/acompañamiento y otras fuentes antes de corregirlo.
+- Si **cambia demasiado**, pasa a **Estable**. Si **se pierde cambios** (un acorde de 2 pulsos, una séptima), pasa a **Detallada**. Tus correcciones se mantienen en cualquier sensibilidad.
+- Acordes con las mismas notas (C6 y Am7, Am/G y C6/G) se nombran según el bajo. Si elige el otro nombre, corrígelo: la alternativa aparece en **Otras lecturas** como *mismas notas*.
+- Si el tempo detectado está mal, los límites de los acordes también lo estarán, porque caen en los pulsos.
+- Voz, solos y percusión densa confunden al detector; una melodía cantada no define un acorde.
+- Para medir si el motor acierta con tu música, usa el banco de la sección 7.
 
-## 11. Archivos importantes
+**En vivo el acorde tarda o puntúa la pista y no lo que toco**
+
+- Usa auriculares: si el parlante llega al micrófono, se escucha la pista.
+- Un cambio tarda unos 0,3–0,6 s en aparecer (Normal); en Detallada responde más rápido y en Estable, más lento.
+
+## 12. Archivos importantes
 
 - server.js: servidor HTTP local, rutas de separación y ejecución de Python.
 - scripts/separate_stems.py: comprobación y lanzamiento de Demucs.
 - public/js/ui/audioDraftAssistant.js: laboratorio, navegación, guardado y escucha en vivo.
 - public/js/ui/audioAnalysisVisualizer.js: mapas, selección de tramos e inspección armónica.
+- public/js/audio/analysisPipeline.js y essentiaAnalysisWorker.js: análisis completo del audio.
+- public/js/harmony/: reconocedor de acordes (croma NNLS, decodificador, refinamiento, pista armónica, seguimiento en vivo, métricas).
+- scripts/eval-harmony.mjs y public/debug/harmony-eval.html: banco de pruebas del reconocedor.
 - public/js/ui/multitrackWorkspace.js: autopsia multipista y Loopera.
 - public/js/data/indexedDb.js: persistencia local.
 - docs/LABORATORIO-V2.md: recorrido y decisiones del laboratorio.
-- tests/: pruebas automatizadas de análisis, segmentación, MIDI y utilidades.
+- tests/: pruebas automatizadas de análisis, armonía, segmentación, MIDI y utilidades.
+- docs/rediseno/: plan por etapas del rediseño y evidencia de cada etapa.
