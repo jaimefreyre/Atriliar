@@ -121,7 +121,10 @@ async function loadLibrary() {
     const info = document.createElement('div'); info.className = 'song-info';
     const name = document.createElement('strong'); name.textContent = project.title || 'Análisis sin título';
     const subtitle = document.createElement('span');
-    subtitle.textContent = `${project.artist || 'Artista sin indicar'} · ${Math.round((project.analysis?.durationMs || 0) / 1000)} s · ${project.analysis?.chordCandidates?.length || 0} tramos`;
+    const chordCount = project.analysis?.harmony
+      ? project.analysis.harmony.regions.filter((region) => region.state === 'harmony').length
+      : project.analysis?.harmonicRegions?.length || project.analysis?.chordCandidates?.length || 0;
+    subtitle.textContent = `${project.artist || 'Artista sin indicar'} · ${Math.round((project.analysis?.durationMs || 0) / 1000)} s · ${chordCount} acordes`;
     info.append(name, subtitle, buildBadge('Laboratorio v2'));
     const actions = document.createElement('div'); actions.className = 'song-actions';
     actions.append(buildActionButton('Abrir laboratorio', 'open-lab', project.id, 'btn-stage'), buildActionButton('🗑️', 'delete-lab', project.id, 'btn-danger'));

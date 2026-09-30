@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start"],
       "port": 3000
+    },
+    {
+      "name": "stageprompter-prueba",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["-e", "process.env.PORT = '3100'; require('./server.js');"],
+      "port": 3100
     }
   ]
 }

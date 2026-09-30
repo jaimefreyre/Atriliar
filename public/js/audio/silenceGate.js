@@ -2,8 +2,6 @@ const DEFAULTS = {
   absoluteRmsFloor: 0.00001,
   relativeRmsFloor: 0.003,
   minSilenceMs: 180,
-  silentRatioThreshold: 0.65,
-  minimumActiveFrames: 3,
 };
 
 function frameSpacingMs(frames) {
@@ -61,21 +59,4 @@ export function detectSilenceFrames(frames, options = {}) {
     index = end;
   }
   return { mask, thresholdRms, spacingMs, minFrames };
-}
-
-/** Shared rule for beat snapshots and harmonic regions. */
-export function summarizeSilenceWindow(frames, options = {}) {
-  const silentRatioThreshold = options.silentRatioThreshold ?? DEFAULTS.silentRatioThreshold;
-  const source = Array.isArray(frames) ? frames : [];
-  const silentFrames = source.filter((frame) => frame.isSilence === true).length;
-  const silenceRatio = source.length ? silentFrames / source.length : 1;
-  const activeFrames = source.filter((frame) => frame.isSilence !== true);
-  const isSilence = source.length === 0 || silenceRatio >= silentRatioThreshold
-    || activeFrames.length < (options.minimumActiveFrames ?? DEFAULTS.minimumActiveFrames);
-  return {
-    isSilence,
-    silenceRatio,
-    silentFrames,
-    activeFrames: isSilence ? [] : activeFrames,
-  };
 }

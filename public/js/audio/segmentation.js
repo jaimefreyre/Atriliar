@@ -22,9 +22,11 @@ export function segmentChordSuggestions(suggestions, durationMs) {
     if (last && last.symbol === current.symbol && last.endMs === current.startMs) {
       last.endMs = endMs;
       last.confidence = Math.min(last.confidence ?? 1, current.confidence ?? 1);
+      // A chord is confirmed only if every piece of it was.
+      last.confirmed = last.confirmed && current.confirmed === true;
     } else {
       resolved.push({ symbol: current.symbol, startMs: current.startMs, endMs,
-        confidence: Number.isFinite(current.confidence) ? current.confidence : null });
+        confidence: Number.isFinite(current.confidence) ? current.confidence : null, confirmed: current.confirmed === true });
     }
   }
   return resolved;

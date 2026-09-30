@@ -91,7 +91,7 @@ test('la instalación precachea todo el shell generado', async () => {
   const shellName = [...sw.caches.stores.keys()].find((name) => name.startsWith('stageprompter-shell-'));
   const cached = [...sw.caches.stores.get(shellName).entries.keys()].sort();
   assert.deepEqual(cached, [...collectShellFiles()].sort());
-  assert.ok(cached.includes('/js/music/chromaMatch.js'));
+  assert.ok(cached.includes('/js/harmony/harmonyTrack.js'));
 });
 
 test('con conexión responde desde la red (sin interfaz vieja) y refresca la copia offline', async () => {
@@ -107,9 +107,9 @@ test('con conexión responde desde la red (sin interfaz vieja) y refresca la cop
 test('sin conexión la app se sirve desde la caché, y una navegación con query cae en "/"', async () => {
   const sw = await installed();
   sw.network.online = false;
-  const moduleEvent = fetchEvent('/js/music/chromaMatch.js');
+  const moduleEvent = fetchEvent('/js/harmony/harmonyTrack.js');
   sw.handlers.fetch(moduleEvent);
-  assert.equal(await (await moduleEvent.responded).text(), 'body of /js/music/chromaMatch.js');
+  assert.equal(await (await moduleEvent.responded).text(), 'body of /js/harmony/harmonyTrack.js');
   const navigation = fetchEvent('/?ui=legacy', { mode: 'navigate' });
   sw.handlers.fetch(navigation);
   assert.equal(await (await navigation.responded).text(), 'body of /');

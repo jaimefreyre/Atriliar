@@ -5,6 +5,9 @@ import { renderAsciiTab } from '../rendering/tabRenderer.js';
 import { SCALES } from '../music/scales.js';
 import { createHarmonicCircle } from './harmonicCircle.js';
 import { extractMidiVoices, midiRegisterFor, selectMidiPlaybackEvents } from '../audio/midiVoices.js';
+import { editAnalysisHarmony, setAnalysisSensitivity } from '../harmony/analysisHarmony.js';
+
+const ALTERNATIVE_REASONS = { 'otra-raiz': 'otra raíz', color: 'color', 'mismas-notas': 'mismas notas', bajo: 'otro bajo' };
 
 const PITCH_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const QUALITIES = ['', 'm', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim', 'aug'];
@@ -64,13 +67,21 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   }
   grouping.value = '4';
   groupingLabel.append(grouping); toolbar.append(groupingLabel);
-  const resolutionLabel = node('label', 'analysis-resolution-label', 'Resolución ');
-  const resolution = node('select', 'analysis-resolution');
-  [['harmony', 'Tramos armónicos estables'], ['pulses', 'Armonía reanalizada por golpe']].forEach(([value, label]) => {
-    const option = node('option', '', label); option.value = value; resolution.append(option);
+  // One chord answer (the harmony track); the knob trades "cambia muchísimo"
+  // against "no detecta cambios" and never overwrites what the musician decided.
+  const sensitivityLabel = node('label', 'analysis-resolution-label', 'Sensibilidad de cambios ');
+  const sensitivity = node('select', 'analysis-sensitivity');
+  [['estable', 'Estable · pocos cambios'], ['normal', 'Normal'], ['detallada', 'Detallada · cambios cortos']].forEach(([value, label]) => {
+    const option = node('option', '', label); option.value = value; sensitivity.append(option);
   });
-  resolution.value = 'pulses';
-  resolutionLabel.append(resolution); toolbar.append(resolutionLabel);
+  sensitivity.value = analysis.harmony?.sensitivity || 'normal';
+  sensitivity.disabled = !analysis.harmony;
+  sensitivityLabel.append(sensitivity); toolbar.append(sensitivityLabel);
+  const beatViewLabel = node('label', 'analysis-resolution-label');
+  const beatView = node('input', 'analysis-beat-view');
+  beatView.type = 'checkbox';
+  beatViewLabel.append(beatView, ' Evidencia por golpe (solo lectura)');
+  toolbar.append(beatViewLabel);
   root.append(toolbar);
 
   const panelControls = node('nav', 'analysis-panel-controls');
@@ -158,9 +169,10 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const visibleHarmonicVoices = [true, true, true];
 
   function getSegments() {
-    if (resolution.value === 'pulses') return analysis.chordCandidates || [];
+    if (beatView.checked) return analysis.chordCandidates || [];
     return analysis.harmonicRegions?.length ? analysis.harmonicRegions : analysis.chordCandidates || [];
   }
+  const indexAt = (timeMs) => Math.max(0, getSegments().findIndex((item) => item.startMs <= timeMs && item.endMs > timeMs));
 
   function applyPanelState() {
     segmentsPanel.hidden = !panelState.segments;
@@ -772,11 +784,11 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     }
     const segments = getSegments();
     if (!detailOnly) {
-      listHeading.textContent = resolution.value === 'pulses'
-        ? 'Armonía y silencios después de cada golpe · ←/→ navegar' : 'Tramos armónicos y silencios · ←/→ navegar';
+      listHeading.textContent = beatView.checked
+        ? 'Evidencia de cada golpe (el acorde se elige en el tramo) · ←/→ navegar' : 'Tramos armónicos y silencios · ←/→ navegar';
       segments.forEach((segment, index) => {
         const chosen = segment.isSilence ? 'Silencio' : segment.selectedSymbol ? `✓ ${segment.selectedSymbol}` : (segment.symbol ? `¿${segment.symbol}?` : 'Sin acorde');
-        const stability = resolution.value === 'pulses' ? `golpe ${segment.beatIndex ?? index + 1}` : `${Math.round(segment.stabilityMs || segment.endMs - segment.startMs)} ms estable`;
+        const stability = beatView.checked ? `golpe ${(segment.beatIndex ?? index) + 1}` : `${Math.round(segment.stabilityMs || segment.endMs - segment.startMs)} ms estable`;
         const item = node('button', 'analysis-segment', `${index + 1} · ${timeLabel(segment.startMs)}–${timeLabel(segment.endMs)} · ${chosen} · ${stability}`);
         item.type = 'button'; item.setAttribute('aria-current', index === selectedIndex ? 'true' : 'false');
         item.addEventListener('click', () => {
@@ -820,12 +832,24 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     const meterFill = node('span', 'analysis-confidence-fill');
     meterFill.style.width = `${segment.isSilence ? 0 : segment.selectedSymbol ? 100 : confidence * 100}%`;
     meter.append(meterFill); chordCard.append(meterLabel, meter); detail.append(chordCard);
-    if (symbol && !segment.accepted && !segment.selectedSymbol) {
+    const tentative = analysis.harmony ? confidence < 0.6 : !segment.accepted;
+    if (symbol && tentative && !segment.selectedSymbol) {
       chordCard.append(node('p', 'analysis-approximate-note', 'Propuesta cercana: la huella se parece, pero otras armonías también encajan. Puedes escucharla, compararla o corregirla.'));
     }
     if (segment.evidence) {
       const evidence = segment.evidence;
-      const note = node('p', 'analysis-boundary-evidence', segment.isSilence
+      const percent = (value) => `${Math.round((Number(value) || 0) * 100)} %`;
+      const note = node('p', 'analysis-boundary-evidence', evidence.method === 'nnls-hmm'
+        ? `Pista armónica v6 · ${evidence.steps} pasos de análisis · confianza ${percent(segment.confidence)} · color ${percent(segment.qualityConfidence)}`
+          + ` · bajo fiable ${percent(evidence.bassReliability)} (dominante ${percent(evidence.bassShare)})`
+          + `${evidence.color?.length ? ` · nota de color sostenida ${evidence.color.map((item) => `${PITCH_NAMES[item.pitchClass]} ${percent(item.sustainedFraction)}`).join(' · ')}` : ''}`
+          + ` · fuerza del cambio ${percent(segment.boundaryStrength)}${segment.source === 'user' ? ' · elegido por vos' : segment.confirmed ? ' · confirmado' : ''}`
+        : evidence.method === 'beat-evidence'
+        ? `Golpe ${evidence.beatIndex} · tempo ${evidence.tempoBpm} BPM (confianza rítmica ${evidence.rhythmConfidence}) · ataque excluido ${segment.transientSkippedMs} ms`
+          + `${evidence.onsetNearBeat ? ' · ataque detectado junto al golpe' : ''} · ${evidence.analyzedFrames} ventanas FFT`
+          + ` · notas fuertes ${evidence.strongestPitchClasses?.join(' · ') || 'sin señal'} · bajo ${evidence.bassNotes?.join(' · ') || 'no disponible'}`
+          + ` · acorde de la pista armónica ${segment.symbol || 'ninguno'}`
+        : segment.isSilence
         ? `Silencio sostenido · ${evidence.frames || evidence.analyzedFrames || 0} ventanas FFT · umbral RMS ${Number.isFinite(evidence.silenceThresholdRms) ? evidence.silenceThresholdRms.toExponential(1) : 'automático'}`
         : evidence.method === 'post-beat harmonic reanalysis'
         ? `Prueba por audio · golpe ${evidence.beatIndex} · tempo ${evidence.tempoBpm} BPM (confianza rítmica ${Math.round((evidence.rhythmConfidence || 0) * 100)}%) · ataque excluido ${evidence.transientSkippedMs} ms${evidence.onsetNearBeat ? ' · onset detectado junto al golpe' : ''} · ${evidence.analyzedFrames} ventanas FFT / ${evidence.analyzedDurationMs} ms · croma dominante ${evidence.strongestPitchClasses?.join(' · ') || 'sin señal'} · guía de bajo ${evidence.bassGuide || 'no disponible'} · tonos del acorde presentes ${evidence.supportedChordTones?.join(' · ') || 'ninguno'} de ${evidence.candidateTones?.join(' · ') || 'sin plantilla'} · cobertura ${Math.round((evidence.chordCoverage || 0) * 100)}% · ajuste ${Math.round((evidence.score || 0) * 100)}% · margen ${evidence.margin?.toFixed(3) ?? '0.000'}${evidence.closeAlternatives?.length ? ` · candidatos ${evidence.closeAlternatives.map((item) => `${item.symbol} ${Math.round(item.score * 100)}%`).join(' / ')}` : ''}`
@@ -842,27 +866,44 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     controls.append(listen, listenStatus);
     const label = node('label', '', 'Acorde para estudiar / usar en el borrador ');
     const chordSelect = node('select', 'analysis-chord-select');
-    chordSelect.disabled = Boolean(segment.isSilence);
-    chordSelect.add(new Option('— Dejar sin asignar —', ''));
-    const alternatives = segment.alternatives || [];
-    if (alternatives.length) {
-      const group = node('optgroup', '', 'Propuestas para este tramo');
-      alternatives.forEach((candidate) => group.append(new Option(`${candidate.symbol} · ${candidate.score.toFixed(3)}`, candidate.symbol)));
+    // Per-beat evidence is read-only: decisions go into the single harmony track.
+    const readOnlyBeat = Boolean(analysis.harmony) && beatView.checked;
+    chordSelect.disabled = Boolean(segment.isSilence) || readOnlyBeat;
+    chordSelect.add(new Option(analysis.harmony ? '— Automático (sin confirmar) —' : '— Dejar sin asignar —', ''));
+    if (analysis.harmony && segment.autoSymbol && segment.source !== 'user' && !readOnlyBeat) {
+      const group = Object.assign(document.createElement('optgroup'), { label: 'Propuesta del motor' });
+      group.append(new Option(`Confirmar ${segment.autoSymbol}`, segment.autoSymbol));
       chordSelect.add(group);
     }
-    const manualGroup = node('optgroup', '', 'Elegir manualmente');
+    const alternatives = (segment.alternatives || []).filter((candidate) => candidate.symbol !== segment.autoSymbol);
+    if (alternatives.length) {
+      const group = Object.assign(document.createElement('optgroup'), { label: 'Otras lecturas de este tramo' });
+      alternatives.forEach((candidate) => group.append(new Option(candidate.reason
+        ? `${candidate.symbol} · ${ALTERNATIVE_REASONS[candidate.reason] || candidate.reason}` : `${candidate.symbol} · ${candidate.score.toFixed(3)}`, candidate.symbol)));
+      chordSelect.add(group);
+    }
+    const manualGroup = Object.assign(document.createElement('optgroup'), { label: 'Elegir manualmente' });
     CHORDS.forEach((symbol) => manualGroup.append(new Option(symbol, symbol)));
     chordSelect.add(manualGroup);
-    chordSelect.value = segment.isSilence ? '' : segment.selectedSymbol || '';
+    chordSelect.value = segment.isSilence || readOnlyBeat ? '' : segment.selectedSymbol || '';
     activeChordSelect = chordSelect;
     chordSelect.addEventListener('change', () => {
-      segment.selectedSymbol = chordSelect.value;
-      segment.selectionSource = chordSelect.value ? 'manual' : 'unassigned';
-      segment.accepted = Boolean(chordSelect.value);
+      if (analysis.harmony) {
+        const { startMs, endMs, autoSymbol, source } = segment;
+        const value = chordSelect.value;
+        editAnalysisHarmony(analysis, !value ? { type: 'clear', startMs, endMs }
+          : value === autoSymbol && source !== 'user' ? { type: 'confirm', startMs, endMs } : { type: 'label', startMs, endMs, symbol: value });
+        selectedIndex = indexAt(startMs);
+      } else {
+        segment.selectedSymbol = chordSelect.value;
+        segment.selectionSource = chordSelect.value ? 'manual' : 'unassigned';
+        segment.accepted = Boolean(chordSelect.value);
+      }
       onChange();
       renderDetail();
     });
     label.append(chordSelect); controls.append(label);
+    if (readOnlyBeat) controls.append(node('p', 'analysis-approximate-note', 'Esta vista muestra qué sonó en cada golpe. Para corregir el acorde, desmarca «Evidencia por golpe» y elige el tramo.'));
     controls.hidden = false;
     detail.append(controls);
 
@@ -1034,7 +1075,15 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
 
   mode.addEventListener('change', drawOverview);
   grouping.addEventListener('change', drawOverview);
-  resolution.addEventListener('change', () => { selectedIndex = 0; renderDetail(); });
+  beatView.addEventListener('change', () => { selectedIndex = indexAt(playbackPositionMs); renderDetail(); });
+  sensitivity.addEventListener('change', () => {
+    if (!analysis.harmony) return;
+    const at = getSegments()[selectedIndex]?.startMs ?? playbackPositionMs;
+    setAnalysisSensitivity(analysis, sensitivity.value);
+    selectedIndex = indexAt(at);
+    onChange();
+    renderDetail();
+  });
   function selectAtCanvas(event, target, leftInset = 48, totalInset = 60) {
     const rect = target.getBoundingClientRect();
     const timeMs = Math.max(0, Math.min(analysis.durationMs - 1, ((event.clientX - rect.left - leftInset) / (rect.width - totalInset)) * analysis.durationMs));

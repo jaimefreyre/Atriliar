@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Banco armónico | StagePrompter</title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <style>
+    body { margin: 0; background: var(--color-page); color: var(--color-text); font-family: var(--font-sans); }
+    .eval { max-inline-size: 72rem; margin-inline: auto; padding: var(--space-5) var(--space-4) var(--space-8); display: grid; gap: var(--space-5); }
+    .eval h1 { margin: 0; font-size: var(--text-xl); }
+    .eval h2 { margin: 0 0 var(--space-3); font-size: var(--text-lg); }
+    .eval h3 { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-md); }
+    .eval p { margin: 0; color: var(--color-text-secondary); line-height: 1.5; }
+    .eval-panel { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-4); display: grid; gap: var(--space-3); }
+    .eval-sources { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); align-items: end; }
+    .eval label { display: grid; gap: var(--space-1); font-size: var(--text-sm); color: var(--color-text-secondary); }
+    .eval select, .eval input[type="file"] { font: inherit; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-2); min-inline-size: 0; }
+    .eval-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+    .eval label.eval-check { display: flex; align-items: center; gap: var(--space-2); color: var(--color-text); }
+    .eval-status { font-family: var(--font-mono); font-size: var(--text-sm); white-space: pre-wrap; color: var(--color-text-secondary); }
+    .eval-table-wrap { overflow-x: auto; }
+    .eval table { border-collapse: collapse; inline-size: 100%; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+    .eval th, .eval td { padding: var(--space-2); border-block-end: 1px solid var(--color-border); text-align: end; white-space: nowrap; }
+    .eval th:first-child, .eval td:first-child { text-align: start; }
+    .eval thead th { color: var(--color-text-muted); font-weight: 600; }
+    .eval-timeline { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-stage); }
+    .eval-timeline__inner { display: grid; gap: 2px; padding: var(--space-2); min-inline-size: 100%; }
+    .eval-row { display: grid; grid-template-columns: 6rem 1fr; gap: var(--space-2); align-items: center; }
+    .eval-row__label { font-size: var(--text-xs); color: var(--color-text-muted); position: sticky; inset-inline-start: 0; background: var(--color-stage); }
+    .eval-track { position: relative; block-size: 1.75rem; }
+    .eval-seg { position: absolute; inset-block: 0; overflow: hidden; border-radius: 3px; font-size: var(--text-xs); line-height: 1.75rem; padding-inline: 3px;
+      background: var(--color-surface-2); color: var(--color-text); border-inline-start: 1px solid var(--color-stage); white-space: nowrap; }
+    .eval-seg--reference { background: var(--color-harmony-bg); }
+    .eval-seg--ok { background: var(--color-confirmed-bg); }
+    .eval-seg--bad { background: var(--color-danger-bg); }
+    .eval-seg--none { background: transparent; color: var(--color-text-muted); }
+    .eval-misses { display: grid; gap: var(--space-1); margin: 0; padding-inline-start: var(--space-5); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+<main class="eval">
+  <header>
+    <p class="sp-eyebrow">Depuración · el audio y los resultados no salen de este equipo</p>
+    <h1>Banco armónico con canciones reales</h1>
+    <p>Compara el motor de acordes con un cifrado que ya revisaste (o con una anotación <code>.lab</code>) y mide lo que el músico nota:
+      <strong>sobresegmentación</strong> («cambia muchísimo»), <strong>subsegmentación</strong> («no detecta cambios») y aciertos por tipo de acorde.</p>
+  </header>
+
+  <section class="eval-panel" aria-labelledby="source-title">
+    <h2 id="source-title">Fuente</h2>
+    <div class="eval-sources">
+      <label>Canción de la biblioteca (con audio y acordes)
+        <select id="song"><option value="">Cargando biblioteca…</option></select>
+      </label>
+      <label>… o un archivo de audio
+        <input type="file" id="audio" accept="audio/*,video/*">
+      </label>
+      <label>Referencia para ese audio (.lab o cifrado JSON v2)
+        <input type="file" id="reference" accept=".lab,.txt,.json,application/json,text/plain">
+      </label>
+    </div>
+    <label class="eval-check"><input type="checkbox" id="covered" checked> Evaluar solo el tramo que cubre la referencia</label>
+    <div class="eval-actions">
+      <button type="button" class="sp-btn sp-btn--primary" id="run" disabled>Analizar y comparar</button>
+      <button type="button" class="sp-btn sp-btn--ghost" id="download" disabled>Descargar reporte JSON</button>
+    </div>
+    <div class="sp-progress" hidden id="progress"><div class="sp-progress__bar"><div class="sp-progress__fill" id="progress-fill" style="inline-size:0%"></div></div></div>
+    <p class="eval-status" id="status" role="status" aria-live="polite">Elige una canción o carga audio y referencia.</p>
+  </section>
+
+  <section class="eval-panel" id="results" hidden aria-labelledby="results-title">
+    <h2 id="results-title">Resultado</h2>
+    <p id="summary"></p>
+    <div class="eval-table-wrap"><table id="metrics"></table></div>
+    <h3>Línea de tiempo</h3>
+    <p>Verde: la familia (mayor/menor) coincide con la referencia · rojo: no coincide.</p>
+    <div class="eval-timeline"><div class="eval-timeline__inner" id="timeline"></div></div>
+    <h3>Dónde no coincide (Normal, por duración)</h3>
+    <ol class="eval-misses" id="misses"></ol>
+  </section>
+</main>
+<script type="module">
+  import { getAllSongsV2, getAsset } from '../js/data/indexedDb.js';
+  import { isLocallyReviewed } from '../js/data/reviewState.js';
+  import { decodeLocalFile } from '../js/audio/decodeLocalFile.js';
+  import { redecodeHarmony, SENSITIVITIES, HARMONY_ENGINE } from '../js/harmony/harmonyTrack.js';
+  import { evaluateHarmony, mapLabel } from '../js/harmony/harmonyMetrics.js';
+  import { parseLabFile } from '../js/harmony/labFormat.js';
+
+  const $ = (id) => document.getElementById(id);
+  const LABELS = { estable: 'Estable', normal: 'Normal', detallada: 'Detallada' };
+  const songs = new Map();
+  let report = null;
+
+  const time = (ms) => `${Math.floor(ms / 60000)}:${((ms / 1000) % 60).toFixed(1).padStart(4, '0')}`;
+  const fmt = (value) => (value === null || value === undefined ? '—' : value.toFixed(3));
+  const setStatus = (text) => { $('status').textContent = text; };
+  const setProgress = (fraction) => {
+    $('progress').hidden = fraction === null;
+    if (fraction !== null) $('progress-fill').style.inlineSize = `${Math.round(fraction * 100)}%`;
+  };
+
+  async function loadLibrary() {
+    const select = $('song');
+    select.replaceChildren(new Option('— Ninguna —', ''));
+    try {
+      for (const song of await getAllSongsV2()) {
+        if (!song.chords?.length || !song.audio?.assetId) continue;
+        songs.set(song.id, song);
+        const reviewed = await isLocallyReviewed(song).catch(() => false);
+        select.add(new Option(`${song.metadata?.title || song.id} · ${song.chords.length} acordes · ${reviewed ? 'revisado' : 'sin revisar'}`, song.id));
+      }
+      if (!songs.size) select.options[0].textContent = 'No hay canciones con audio y acordes';
+    } catch (error) {
+      select.options[0].textContent = 'No se pudo abrir la biblioteca';
+      setStatus(`Biblioteca no disponible: ${error.message}`);
+    }
+  }
+
+  function chartReference(doc) {
+    const offset = Number(doc.audio?.offsetMs) || 0;
+    return (doc.chords || []).map((chord) => ({ startMs: chord.startMs + offset, endMs: chord.endMs + offset, symbol: chord.symbol || 'N' }));
+  }
+
+  async function readReference(file) {
+    const text = await file.text();
+    if (/\.json$/i.test(file.name) || text.trim().startsWith('{')) {
+      const doc = JSON.parse(text);
+      if (!Array.isArray(doc.chords)) throw new Error('El JSON no tiene chords[] (se espera un SongDocument v2).');
+      return { name: doc.metadata?.title || file.name, reference: chartReference(doc) };
+    }
+    const { segments, errors } = parseLabFile(text);
+    if (!segments.length) throw new Error('El archivo .lab no tiene segmentos válidos.');
+    if (errors.length) setStatus(`Se ignoraron ${errors.length} líneas mal formadas del .lab (primera: línea ${errors[0].line}).`);
+    return { name: file.name, reference: segments.map(({ startMs, endMs, symbol }) => ({ startMs, endMs, symbol })) };
+  }
+
+  function refreshRunButton() {
+    $('run').disabled = !($('song').value || ($('audio').files?.length && $('reference').files?.length));
+  }
+  ['song', 'audio', 'reference'].forEach((id) => $(id).addEventListener('change', refreshRunButton));
+
+  /** The same Worker and pipeline as the lab. Resolves with the analysis. */
+  function analyse(decoded) {
+    return new Promise((resolve, reject) => {
+      const worker = new Worker('../js/audio/essentiaAnalysisWorker.js', { type: 'module' });
+      const stages = { rhythm: 'tempo y pulsos', peaks: 'picos espectrales', harmony: 'armonía', done: 'resultado' };
+      worker.onmessage = ({ data }) => {
+        if (data.type === 'ready') worker.postMessage({ ...decoded, type: 'analyse' }, [decoded.pcm.buffer]);
+        else if (data.type === 'progress') { setProgress(data.fraction); setStatus(`Analizando ${stages[data.stage] || data.stage}… ${Math.round(data.fraction * 100)} %`); }
+        else if (data.type === 'warning') setStatus(`Aviso: ${data.message}`);
+        else if (data.type === 'analysis') { worker.terminate(); resolve(data); }
+        else if (data.type === 'error') { worker.terminate(); reject(new Error(data.message)); }
+      };
+      worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || 'Falló el Worker de análisis.')); };
+      worker.postMessage({ type: 'init' });
+    });
+  }
+
+  /** Clip and shift segments to [startMs, endMs) so metrics only look at the annotated span. */
+  function clip(segments, startMs, endMs) {
+    return segments.map((segment) => ({ ...segment, startMs: Math.max(segment.startMs, startMs) - startMs, endMs: Math.min(segment.endMs, endMs) - startMs }))
+      .filter((segment) => segment.endMs > segment.startMs);
+  }
+
+  function disagreements(reference, estimate) {
+    const cuts = [...new Set([...reference, ...estimate].flatMap((segment) => [segment.startMs, segment.endMs]))].sort((a, b) => a - b);
+    const at = (list, t) => list.find((segment) => segment.startMs <= t && segment.endMs > t)?.symbol || 'N';
+    const spans = [];
+    for (let index = 0; index < cuts.length - 1; index++) {
+      const middle = (cuts[index] + cuts[index + 1]) / 2;
+      const ref = at(reference, middle), est = at(estimate, middle);
+      if (mapLabel(ref, 'majmin') === 'X' || mapLabel(ref, 'majmin') === mapLabel(est, 'majmin')) continue;
+      const last = spans.at(-1);
+      if (last && last.endMs === cuts[index] && last.ref === ref && last.est === est) last.endMs = cuts[index + 1];
+      else spans.push({ startMs: cuts[index], endMs: cuts[index + 1], ref, est });
+    }
+    // Slivers shorter than the boundary tolerance are timing, not wrong chords.
+    return spans.filter((span) => span.endMs - span.startMs >= 250).sort((a, b) => (b.endMs - b.startMs) - (a.endMs - a.startMs));
+  }
+
+  function renderTimeline(rows, durationMs, reference) {
+    const host = $('timeline');
+    host.style.minInlineSize = `${Math.max(40, durationMs / 1000 * 1.2)}rem`;
+    host.replaceChildren();
+    const refAt = (t) => reference.find((segment) => segment.startMs <= t && segment.endMs > t)?.symbol || 'N';
+    for (const { label, segments, isReference } of rows) {
+      const row = document.createElement('div'); row.className = 'eval-row';
+      const name = document.createElement('span'); name.className = 'eval-row__label'; name.textContent = label;
+      const track = document.createElement('div'); track.className = 'eval-track';
+      for (const segment of segments) {
+        const piece = document.createElement('span');
+        const none = !segment.symbol || segment.symbol === 'N';
+        const ok = mapLabel(segment.symbol || 'N', 'majmin') === mapLabel(refAt((segment.startMs + segment.endMs) / 2), 'majmin');
+        piece.className = `eval-seg ${isReference ? 'eval-seg--reference' : none ? 'eval-seg--none' : ok ? 'eval-seg--ok' : 'eval-seg--bad'}`;
+        piece.style.insetInlineStart = `${(segment.startMs / durationMs) * 100}%`;
+        piece.style.inlineSize = `${((segment.endMs - segment.startMs) / durationMs) * 100}%`;
+        piece.textContent = none ? '' : segment.symbol;
+        piece.title = `${time(segment.startMs)}–${time(segment.endMs)} · ${segment.symbol || 'sin acorde'}`;
+        track.append(piece);
+      }
+      row.append(name, track); host.append(row);
+    }
+  }
+
+  $('run').addEventListener('click', async () => {
+    $('run').disabled = true; $('download').disabled = true; $('results').hidden = true; report = null;
+    try {
+      let file, source;
+      if ($('song').value) {
+        const song = songs.get($('song').value);
+        const asset = await getAsset(song.audio.assetId);
+        if (!asset?.blob) throw new Error('Falta el audio de esta canción en la biblioteca.');
+        file = new File([asset.blob], asset.name || 'audio', { type: asset.mime || asset.blob.type });
+        source = { name: song.metadata?.title || song.id, reference: chartReference(song) };
+      } else {
+        file = $('audio').files[0];
+        source = await readReference($('reference').files[0]);
+      }
+      setStatus(`Decodificando ${file.name}…`); setProgress(0);
+      const decoded = await decodeLocalFile(file);
+      const started = performance.now();
+      const analysis = await analyse(decoded);
+      const seconds = (performance.now() - started) / 1000;
+      if (!analysis.harmony) throw new Error('El análisis no produjo pista armónica.');
+      const reference = source.reference.filter((segment) => segment.endMs > segment.startMs).sort((a, b) => a.startMs - b.startMs);
+      const covered = $('covered').checked && reference.length;
+      const spanStart = covered ? reference[0].startMs : 0;
+      const spanEnd = covered ? Math.min(analysis.durationMs, reference.at(-1).endMs) : analysis.durationMs;
+      const refClip = clip(reference, spanStart, spanEnd);
+      const results = SENSITIVITIES.map((sensitivity) => {
+        const track = sensitivity === analysis.harmony.sensitivity ? analysis.harmony : redecodeHarmony(analysis.harmony, { sensitivity });
+        const estimate = track.regions.map((region) => ({ startMs: region.startMs, endMs: region.endMs, symbol: region.symbol }));
+        const metrics = evaluateHarmony(refClip, clip(estimate, spanStart, spanEnd), { durationMs: spanEnd - spanStart });
+        return { sensitivity, estimate, metrics };
+      });
+      const cells = (m) => [m.wcsr.majmin, m.wcsr.majminInv, m.wcsr.sevenths, m.wcsr.root, m.overSegmentation, m.underSegmentation, m.boundary.f1]
+        .map(fmt).concat(`${m.changesPerMinute.estimate.toFixed(1)} / ${m.changesPerMinute.reference.toFixed(1)}`, fmt(m.noChordRecall));
+      $('metrics').innerHTML = '';
+      const head = $('metrics').createTHead().insertRow();
+      ['Sensibilidad', 'Mayor/menor', 'Con inversión', 'Séptimas', 'Raíz', 'Sobresegm.', 'Subsegm.', 'F1 límites', 'Cambios/min (motor / ref.)', 'Silencio'].forEach((text) => {
+        const th = document.createElement('th'); th.textContent = text; head.append(th);
+      });
+      const body = $('metrics').createTBody();
+      for (const { sensitivity, metrics } of results) {
+        const row = body.insertRow();
+        [LABELS[sensitivity], ...cells(metrics)].forEach((text) => { row.insertCell().textContent = text; });
+      }
+      $('summary').textContent = `${source.name} · ${time(analysis.durationMs)} · ${analysis.bpm.toFixed(1)} BPM detectado · rejilla ${analysis.harmony.gridKind}`
+        + ` · afinación ${analysis.harmony.frontEnd.tuningCents} cents · análisis en ${seconds.toFixed(1)} s · referencia de ${reference.length} acordes`
+        + (covered ? ` · evaluado ${time(spanStart)}–${time(spanEnd)}` : '');
+      renderTimeline([{ label: 'Referencia', segments: reference, isReference: true },
+        ...results.map(({ sensitivity, estimate }) => ({ label: LABELS[sensitivity], segments: estimate }))], analysis.durationMs, reference);
+      const normal = results.find((item) => item.sensitivity === 'normal');
+      const misses = disagreements(reference.filter((s) => s.endMs > spanStart && s.startMs < spanEnd), normal.estimate.filter((s) => s.endMs > spanStart && s.startMs < spanEnd));
+      $('misses').replaceChildren(...(misses.length ? misses.slice(0, 15).map((miss) => {
+        const item = document.createElement('li');
+        item.textContent = `${time(miss.startMs)}–${time(miss.endMs)} · referencia ${miss.ref} · motor ${miss.est === 'N' ? 'sin acorde' : miss.est}`;
+        return item;
+      }) : [Object.assign(document.createElement('li'), { textContent: 'Sin diferencias de familia.' })]));
+      report = { generatedAt: new Date().toISOString(), engine: HARMONY_ENGINE, song: source.name, durationMs: analysis.durationMs, bpm: analysis.bpm,
+        evaluatedSpanMs: [spanStart, spanEnd], analysisSeconds: Number(seconds.toFixed(2)), referenceChords: reference.length,
+        results: results.map(({ sensitivity, metrics }) => ({ sensitivity, metrics })), misses: misses.slice(0, 50) };
+      $('results').hidden = false; $('download').disabled = false;
+      setStatus('Listo. Nada se envió fuera de este equipo.');
+    } catch (error) {
+      setStatus(`No se pudo evaluar: ${error.message}`);
+    } finally {
+      setProgress(null); refreshRunButton();
+    }
+  });
+
+  $('download').addEventListener('click', () => {
+    if (!report) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const link = Object.assign(document.createElement('a'), { href: url, download: `armonia-${report.song.replace(/[^\w-]+/g, '_')}.json` });
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  loadLibrary().then(refreshRunButton);
+</script>
+</body>
+</html>

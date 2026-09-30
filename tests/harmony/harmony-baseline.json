@@ -1,0 +1,799 @@
+{
+  "generatedAt": "2026-09-30T16:17:10.402Z",
+  "fixtures": {
+    "pop4": {
+      "notes": "C–G–Am–F, un acorde por compás, 100 BPM",
+      "durationMs": 19450,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "fast": {
+      "notes": "cambios cada 2 pulsos y un acorde de paso de 1 pulso, 120 BPM",
+      "durationMs": 10250,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.6951219512195121,
+          "majminInv": 0.5,
+          "sevenths": 0.6951219512195121,
+          "root": 0.6951219512195121,
+          "overSegmentation": 0.9878048780487805,
+          "underSegmentation": 0.5975609756097561,
+          "boundaryF1": 0.6666666666666666,
+          "spurious": 0,
+          "missed": 5,
+          "changesPerMinute": 29.26829268292683,
+          "referenceChangesPerMinute": 58.53658536585366,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.9878048780487805,
+          "majminInv": 0.9878048780487805,
+          "sevenths": 0.9390243902439024,
+          "root": 0.9878048780487805,
+          "overSegmentation": 0.9878048780487805,
+          "underSegmentation": 0.9390243902439024,
+          "boundaryF1": 0.9473684210526316,
+          "spurious": 0,
+          "missed": 1,
+          "changesPerMinute": 52.6829268292683,
+          "referenceChangesPerMinute": 58.53658536585366,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.9878048780487805,
+          "majminInv": 0.9878048780487805,
+          "sevenths": 0.9878048780487805,
+          "root": 0.9878048780487805,
+          "overSegmentation": 0.9878048780487805,
+          "underSegmentation": 0.9878048780487805,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 58.53658536585366,
+          "referenceChangesPerMinute": 58.53658536585366,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "pedal": {
+      "notes": "acordes que cambian sobre un pedal de C en el bajo",
+      "durationMs": 17050,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.633431085043988,
+          "referenceChangesPerMinute": 24.633431085043988,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.633431085043988,
+          "referenceChangesPerMinute": 24.633431085043988,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.633431085043988,
+          "referenceChangesPerMinute": 24.633431085043988,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "walking": {
+      "notes": "un solo C con bajo fundamental-quinta y después caminante: no debe partirse",
+      "durationMs": 19886,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.034396057527909,
+          "referenceChangesPerMinute": 6.034396057527909,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.034396057527909,
+          "referenceChangesPerMinute": 6.034396057527909,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.034396057527909,
+          "referenceChangesPerMinute": 6.034396057527909,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "descending": {
+      "notes": "bajo descendente sostenido: Am – Am/G – Am/F# – Fmaj7",
+      "durationMs": 21583,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.9942084047630079,
+          "majminInv": 0.49997683361905204,
+          "sevenths": 0.9942084047630079,
+          "root": 0.9942084047630079,
+          "overSegmentation": 0.9942084047630079,
+          "underSegmentation": 0.500023166380948,
+          "boundaryF1": 0.6666666666666666,
+          "spurious": 0,
+          "missed": 4,
+          "changesPerMinute": 11.119862855024788,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.9942084047630079,
+          "majminInv": 0.9942084047630079,
+          "sevenths": 0.9942084047630079,
+          "root": 0.9942084047630079,
+          "overSegmentation": 0.9942084047630079,
+          "underSegmentation": 0.9942084047630079,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 22.239725710049576,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.9942084047630079,
+          "majminInv": 0.9942084047630079,
+          "sevenths": 0.9942084047630079,
+          "root": 0.9942084047630079,
+          "overSegmentation": 0.9942084047630079,
+          "underSegmentation": 0.9942084047630079,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 22.239725710049576,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "colors": {
+      "notes": "sus, séptimas y un cliché C–Cmaj7–C7–C6",
+      "durationMs": 26650,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 0.7917570498915402,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 0.6848030018761726,
+          "boundaryF1": 0.8,
+          "spurious": 0,
+          "missed": 4,
+          "changesPerMinute": 18.01125703564728,
+          "referenceChangesPerMinute": 27.01688555347092,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 27.01688555347092,
+          "referenceChangesPerMinute": 27.01688555347092,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 27.01688555347092,
+          "referenceChangesPerMinute": 27.01688555347092,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "silence": {
+      "notes": "pausas de 1,5 s y un corte de 1 pulso",
+      "durationMs": 10250,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 35.12195121951219,
+          "referenceChangesPerMinute": 35.12195121951219,
+          "noChordRecall": 1,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 35.12195121951219,
+          "referenceChangesPerMinute": 35.12195121951219,
+          "noChordRecall": 1,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 35.12195121951219,
+          "referenceChangesPerMinute": 35.12195121951219,
+          "noChordRecall": 1,
+          "failures": []
+        }
+      }
+    },
+    "detuned-30": {
+      "notes": "pop4 desafinado −30 cents",
+      "durationMs": 19450,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "detuned+40": {
+      "notes": "pop4 desafinado +40 cents",
+      "durationMs": 19450,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 24.678663239074552,
+          "referenceChangesPerMinute": 24.678663239074552,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "melody": {
+      "notes": "C sostenido con una melodía en corcheas encima, después G",
+      "durationMs": 19450,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.169665809768638,
+          "referenceChangesPerMinute": 6.169665809768638,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.169665809768638,
+          "referenceChangesPerMinute": 6.169665809768638,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.993573264781491,
+          "majminInv": 0.993573264781491,
+          "sevenths": 0.993573264781491,
+          "root": 0.993573264781491,
+          "overSegmentation": 0.993573264781491,
+          "underSegmentation": 0.993573264781491,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 6.169665809768638,
+          "referenceChangesPerMinute": 6.169665809768638,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "drums-intro": {
+      "notes": "4 compases solo de batería y después acordes con batería",
+      "durationMs": 26432,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 20.429782082324454,
+          "referenceChangesPerMinute": 20.429782082324454,
+          "noChordRecall": 1,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 20.429782082324454,
+          "referenceChangesPerMinute": 20.429782082324454,
+          "noChordRecall": 1,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 20.429782082324454,
+          "referenceChangesPerMinute": 20.429782082324454,
+          "noChordRecall": 1,
+          "failures": []
+        }
+      }
+    },
+    "rubato": {
+      "notes": "pads con tempo que oscila entre 70 y 90",
+      "durationMs": 24011,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 19.990837532797467,
+          "referenceChangesPerMinute": 19.990837532797467,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 19.990837532797467,
+          "referenceChangesPerMinute": 19.990837532797467,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 19.990837532797467,
+          "referenceChangesPerMinute": 19.990837532797467,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "power": {
+      "notes": "power chords saturados",
+      "durationMs": 16250,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 29.538461538461537,
+          "referenceChangesPerMinute": 29.538461538461537,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 29.538461538461537,
+          "referenceChangesPerMinute": 29.538461538461537,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 29.538461538461537,
+          "referenceChangesPerMinute": 29.538461538461537,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "anticipation": {
+      "notes": "pop4 con los cambios medio pulso antes",
+      "durationMs": 21583,
+      "results": {
+        "v6/estable": {
+          "majmin": 0.9940694064773201,
+          "majminInv": 0.9940694064773201,
+          "sevenths": 0.9940694064773201,
+          "root": 0.9940694064773201,
+          "overSegmentation": 0.9940694064773201,
+          "underSegmentation": 0.9940694064773201,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 22.239725710049576,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 0.9940694064773201,
+          "majminInv": 0.9940694064773201,
+          "sevenths": 0.9940694064773201,
+          "root": 0.9940694064773201,
+          "overSegmentation": 0.9940694064773201,
+          "underSegmentation": 0.9940694064773201,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 22.239725710049576,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 0.9940694064773201,
+          "majminInv": 0.9940694064773201,
+          "sevenths": 0.9940694064773201,
+          "root": 0.9940694064773201,
+          "overSegmentation": 0.9940694064773201,
+          "underSegmentation": 0.9940694064773201,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 22.239725710049576,
+          "referenceChangesPerMinute": 22.239725710049576,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    },
+    "demo": {
+      "notes": "la canción demo del contrato (Camino de luz, 16 compases)",
+      "durationMs": 32250,
+      "results": {
+        "v6/estable": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 27.906976744186046,
+          "referenceChangesPerMinute": 27.906976744186046,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/normal": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 27.906976744186046,
+          "referenceChangesPerMinute": 27.906976744186046,
+          "noChordRecall": null,
+          "failures": []
+        },
+        "v6/detallada": {
+          "majmin": 1,
+          "majminInv": 1,
+          "sevenths": 1,
+          "root": 1,
+          "overSegmentation": 1,
+          "underSegmentation": 1,
+          "boundaryF1": 1,
+          "spurious": 0,
+          "missed": 0,
+          "changesPerMinute": 27.906976744186046,
+          "referenceChangesPerMinute": 27.906976744186046,
+          "noChordRecall": null,
+          "failures": []
+        }
+      }
+    }
+  },
+  "summary": {
+    "v6/estable": {
+      "majmin": 0.9772,
+      "sevenths": 0.9633,
+      "overSegmentation": 0.9967,
+      "underSegmentation": 0.9167,
+      "boundaryF1": 0.9422,
+      "noChordRecall": 1,
+      "changesRatio": 0.9111
+    },
+    "v6/normal": {
+      "majmin": 0.9967,
+      "sevenths": 0.9934,
+      "overSegmentation": 0.9967,
+      "underSegmentation": 0.9934,
+      "boundaryF1": 0.9965,
+      "noChordRecall": 1,
+      "changesRatio": 0.9933
+    },
+    "v6/detallada": {
+      "majmin": 0.9967,
+      "sevenths": 0.9967,
+      "overSegmentation": 0.9967,
+      "underSegmentation": 0.9967,
+      "boundaryF1": 1,
+      "noChordRecall": 1,
+      "changesRatio": 1
+    }
+  }
+}

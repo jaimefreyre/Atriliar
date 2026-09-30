@@ -1,3 +1,5 @@
+import { contextToPerfMs, inputLatencyMsFor } from './frameClock.js';
+
 /**
  * Browser capture is started only by an explicit user action. The microphone
  * stream is never connected audibly to the output and stop/dispose closes its
@@ -13,12 +15,14 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
   let worker = null;
   let harmonyWorker = null;
   let disposed = false;
+  let inputLatencyMs = 0;
 
   // Worklet timestamps live on the AudioContext timeline; convert them to the
-  // performance.now() clock the UI uses. Null when the frame has none.
+  // performance.now() clock the UI uses, minus the input latency the track
+  // reports. Null when the frame has none.
   function observedPerfMsFor(timestampMs) {
-    if (!Number.isFinite(timestampMs) || !context) return null;
-    return performance.now() - Math.max(0, context.currentTime * 1000 - timestampMs);
+    if (!context) return null;
+    return contextToPerfMs(timestampMs, { contextNowMs: context.currentTime * 1000, perfNowMs: performance.now(), inputLatencyMs });
   }
 
   async function start() {
@@ -34,6 +38,7 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
       throw new Error('La captura se cerró antes de obtener el permiso del micrófono.');
     }
     stream = acquiredStream;
+    inputLatencyMs = inputLatencyMsFor(stream.getAudioTracks()[0]);
     try {
       context ||= new (window.AudioContext || window.webkitAudioContext)();
       if (context.state === 'suspended') await context.resume();
@@ -94,5 +99,5 @@ export function createMicCapture({ audioContext = null, onFrame = () => {}, onHa
   }
 
   async function dispose() { if (disposed) return; disposed = true; await stop(); }
-  return { start, stop, dispose, get active() { return !!stream; } };
+  return { start, stop, dispose, get active() { return !!stream; }, get inputLatencyMs() { return inputLatencyMs; } };
 }

@@ -6,13 +6,13 @@ import { openPlayerView } from './playerView.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
 import { createAudioAnalysisVisualizer } from './audioAnalysisVisualizer.js';
 import { createMicCapture } from '../audio/micCapture.js';
-import { createLiveChordStabilizer } from '../audio/liveChordStabilizer.js';
+import { mediaPositionAt } from '../audio/frameClock.js';
+import { createLiveChordTracker, createChordVerifier } from '../harmony/liveChordTracker.js';
 import { createLivePitchTracker } from '../audio/livePitchTracker.js';
 import { expandPitchClassesAcrossOctaves } from '../audio/chordTemplateMatch.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
-import { scoreChordChroma } from '../music/chromaMatch.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
-import { buildHarmonicRegions } from '../audio/harmonicSegmentation.js';
+import { migrateAnalysisToV6, isProvisionalHarmony } from '../harmony/analysisHarmony.js';
 import { initialLabSections, sectionAt, splitLabSection, buildLabSong } from '../audio/labComposition.js';
 import { buildWaveformEnvelope } from '../audio/waveformEnvelope.js';
 import { createLiveHarmonicRadar } from './harmonicCircle.js';
@@ -58,9 +58,13 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   let liveView = null;
   let liveScores = [];
   let lastLiveSegmentStartMs = null;
-  const liveChordStabilizer = createLiveChordStabilizer({ alpha: 0.26, minScore: 0.4, minMargin: 0.025, confirmMs: 340 });
+  // Same families and emissions as the offline engine; the verifier answers
+  // "¿estás tocando el acorde esperado?" against the harmony track.
+  let liveChordTracker = createLiveChordTracker();
+  const liveVerifier = createChordVerifier();
   const livePitchTracker = createLivePitchTracker({ minConfidence: 0.22, confirmMs: 280, releaseMs: 350, frequencyAlpha: 0.2 });
   let liveChordResult = null;
+  let liveVerdict = null;
   let currentLiveNote = null;
   let lastPlayheadDrawAt = 0;
   let lastSignalDisplayAt = 0;
@@ -346,11 +350,17 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       if (assetToSave) await saveLabProjectWithAsset(snapshot, assetToSave);
       else await saveLabProject(snapshot);
     });
-    return saveQueue.then(() => { status.textContent = 'Laboratorio guardado en este dispositivo.'; }, (error) => {
+    return saveQueue.then(() => { status.textContent = `Laboratorio guardado en este dispositivo.${harmonyNotice()}`; }, (error) => {
       if (assetToSave) pendingAsset = assetToSave;
       status.textContent = `No se pudo guardar el laboratorio: ${error?.message || error}`;
       throw error;
     });
+  }
+  /** Kept on every status update while the chords still come from a pre-v6 analysis. */
+  function harmonyNotice() {
+    if (!isProvisionalHarmony(analysis)) return '';
+    const kept = analysis.harmonyMigration?.keptChoices || 0;
+    return `\nAcordes convertidos del motor anterior${kept ? ` (${kept} elecciones tuyas conservadas)` : ''}. Pulsa «Analizar archivo» para usar el motor nuevo: tus acordes se conservan.`;
   }
   function scheduleProjectSave() {
     if (!analysis && !selectedFile && !multitrackState.stems?.length && !multitrackState.loop?.tracks?.length) return;
@@ -534,7 +544,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     const data = suggested ? getChordTones(suggested.symbol) : null;
     const changing = Boolean(proposal && confirmed && proposal.symbol !== confirmed.symbol && supports(proposal));
     const state = suggested
-      ? changing ? `cambio candidato · ${Math.min(340, liveChordResult.pendingMs)}/340 ms`
+      ? changing ? `cambio candidato · ${Math.round(Math.min(liveChordResult.holdMs, liveChordResult.pendingMs))}/${liveChordResult.holdMs} ms`
         : suggested === confirmed || suggested.symbol === confirmed?.symbol ? 'estable confirmado' : 'propuesta del micrófono'
       : (proposal || confirmed) ? 'sin evidencia suficiente · no confirmado' : 'esperando armonía';
     return { suggested, data, state };
@@ -704,11 +714,13 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     if (liveScores.length && liveScores.at(-1).frame) {
       if (confirmed && confirmed.symbol === micSymbol && chordSupported) {
         const matches = confirmed.symbol === referenceSymbol;
+        const hold = liveChordResult.holdMs;
         const pending = proposal && proposal.symbol !== confirmed.symbol
-          ? ` · verificando ${proposal.symbol} (${Math.min(340, liveChordResult.pendingMs)}/340 ms)` : '';
-        liveGuess.textContent = `Acorde estable: ${confirmed.symbol} · ajuste ${confirmed.score.toFixed(2)}${matches ? ' · coincide con el tramo' : ''}${pending}`;
+          ? ` · verificando ${proposal.symbol} (${Math.round(Math.min(hold, liveChordResult.pendingMs))}/${hold} ms)` : '';
+        liveGuess.textContent = `Acorde estable: ${confirmed.symbol} · certeza ${Math.round(confirmed.score * 100)}%${matches ? ' · coincide con el tramo' : ''}${pending}`;
       } else if (proposal && proposal.symbol === micSymbol && chordSupported) {
-        liveGuess.textContent = `Evaluando ${proposal.symbol} · ${Math.min(340, liveChordResult.pendingMs)}/340 ms antes de confirmar`;
+        const hold = liveChordResult.holdMs;
+        liveGuess.textContent = `Evaluando ${proposal.symbol} · ${Math.round(Math.min(hold, liveChordResult.pendingMs))}/${hold} ms antes de confirmar`;
       } else if (!confirmed && !proposal) liveGuess.textContent = detectedNote
         ? `Nota del micrófono: ${detectedNote} · esperando otras notas para formar un acorde`
         : 'Escucha estimada: armonía ambigua; esperando una propuesta clara';
@@ -725,13 +737,22 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
           : '';
         liveSimilarity.textContent = mean === null ? 'Afinidad armónica: esperando señal' : `Afinidad armónica: ${Math.round(mean * 100)}%${trend}`;
       }
-      if (segment.selectedSymbol) {
-        const fit = scoreChordChroma(frame.chroma, segment.selectedSymbol);
-        liveCompatibility.textContent = fit.status === 'scored'
-          ? `Energía captada dentro de ${segment.selectedSymbol}: ${Math.round(fit.ratio * 100)}% (orientativo).`
-          : 'Compatibilidad con el acorde elegido: señal insuficiente.';
-      } else liveCompatibility.textContent = 'Elige un acorde para ver compatibilidad con su conjunto de notas.';
+      liveCompatibility.textContent = describeVerdict(liveVerdict);
     }
+  }
+  function describeVerdict(verdict) {
+    if (!verdict || verdict.status === 'sin-referencia') return 'Cotejo: sin acorde de referencia en esta posición.';
+    const pending = verdict.pending ? ' · verificando' : '';
+    if (verdict.status === 'coincide') return `Cotejo: coincide con ${verdict.expected}${pending}.`;
+    if (verdict.status === 'parcial') return `Cotejo: parcial · ${verdict.expected} sin ${verdict.missing.join(', ')}${pending}.`;
+    if (verdict.status === 'no-coincide') return `Cotejo: no coincide con ${verdict.expected}${verdict.soundsLike ? ` · suena como ${verdict.soundsLike}` : ''}${pending}.`;
+    return `Cotejo: escuchando ${verdict.expected || ''}…`;
+  }
+  /** Chords the chart expects around a (latency-compensated) song position. */
+  function expectedChordsAt(positionMs) {
+    return (analysis?.harmonicRegions || [])
+      .filter((region) => region.state === 'harmony' && region.endMs > positionMs - 200 && region.startMs < positionMs + 150)
+      .map((region) => region.symbol);
   }
   referenceCheckbox.addEventListener('change', () => {
     try { localStorage.setItem(referencePreferenceKey, String(referenceCheckbox.checked)); } catch { /* storage may be disabled */ }
@@ -797,43 +818,19 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   });
   function refreshAnalysisSummary() {
     if (!analysis) return;
-    const segments = analysis.harmonicRegions?.length ? analysis.harmonicRegions : analysis.chordCandidates;
-    analysis.chordSuggestions = segments.filter((segment) => !segment.isSilence && segment.selectedSymbol)
-      .map((segment) => ({ symbol: segment.selectedSymbol, startMs: segment.startMs, endMs: segment.endMs }));
-    const unassigned = segments.filter((segment) => !segment.isSilence && !segment.selectedSymbol).length;
-    preview.textContent = `${selectedFile?.name || 'Pista no vinculada'}\nDuración: ${(analysis.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(analysis.bpm) ? analysis.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${analysis.beats?.length || 0}\nTramos armónicos: ${segments.length} · fotos por pulso: ${analysis.chordCandidates.length}\nAcordes elegidos: ${analysis.chordSuggestions.length} · sin asignar: ${unassigned}`;
+    // chordSuggestions is a view of the harmony track (every chord, confirmed or estimated).
+    const regions = analysis.harmonicRegions || [];
+    const chords = analysis.chordSuggestions || [];
+    const confirmedCount = chords.filter((chord) => chord.confirmed).length;
+    const unclear = regions.filter((region) => region.state === 'no-chord').length;
+    const sensitivity = { estable: 'Estable', normal: 'Normal', detallada: 'Detallada' }[analysis.harmony?.sensitivity] || 'sin pista armónica';
+    preview.textContent = `${selectedFile?.name || 'Pista no vinculada'}\nDuración: ${(analysis.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(analysis.bpm) ? analysis.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${analysis.beats?.length || 0}\nAcordes: ${chords.length} (${confirmedCount} confirmados · ${chords.length - confirmedCount} estimados)${unclear ? ` · ${unclear} tramos sin acorde claro` : ''}\nSensibilidad de cambios: ${sensitivity}${isProvisionalHarmony(analysis) ? ' · convertido del motor anterior' : ''}`;
   }
   function showAnalysis(data, { restored = false } = {}) {
-    const needsHarmonicMigration = data.harmonicSegmentationVersion !== 5 && data.chordCandidates?.length;
-    if (needsHarmonicMigration) {
-      const previousRegions = data.harmonicRegions || [];
-      const pulseFrames = data.chordCandidates.map((segment) => {
-        const timeMs = (segment.startMs + segment.endMs) / 2;
-        const spectralFrame = (data.spectralFrames || []).reduce((closest, frame) =>
-          !closest || Math.abs(frame.timeMs - timeMs) < Math.abs(closest.timeMs - timeMs) ? frame : closest, null);
-        return {
-          timeSec: timeMs / 1000,
-          chroma: segment.chroma || Array(12).fill(0),
-          spectralPeaks: segment.spectralPeaks || [],
-          rms: Number.isFinite(segment.rms) ? segment.rms : spectralFrame?.rms,
-          isSilence: segment.isSilence === true || spectralFrame?.isSilence === true,
-        };
-      });
-      const rebuilt = buildHarmonicRegions(pulseFrames, data.durationMs, data.bpm);
-      rebuilt.forEach((region) => {
-        if (region.isSilence) return;
-        const retained = new Map();
-        previousRegions.filter((previous) => previous.selectedSymbol && previous.endMs > region.startMs && previous.startMs < region.endMs)
-          .forEach((previous) => {
-            const overlap = Math.max(0, Math.min(region.endMs, previous.endMs) - Math.max(region.startMs, previous.startMs));
-            retained.set(previous.selectedSymbol, (retained.get(previous.selectedSymbol) || 0) + overlap);
-          });
-        const [symbol] = [...retained].sort((left, right) => right[1] - left[1])[0] || [];
-        if (symbol) { region.selectedSymbol = symbol; region.selectionSource = 'manual'; region.accepted = true; }
-      });
-      data.harmonicRegions = rebuilt;
-      data.harmonicSegmentationVersion = 5;
-    }
+    // Pre-v6 analyses get a provisional track from their stored chroma; every
+    // chord the musician picked (per region or per beat) becomes a constraint.
+    const needsHarmonicMigration = !data.harmony && data.chordCandidates?.length > 0;
+    if (needsHarmonicMigration) migrateAnalysisToV6(data);
     analysis = data;
     if (needsHarmonicMigration && !restored) scheduleProjectSave();
     if (!labSections.length) labSections = initialLabSections(analysis.durationMs);
@@ -893,6 +890,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     status.textContent = restored
       ? 'Análisis recuperado. Selecciona un tramo para escucharlo o edita la estructura y la letra.'
       : 'Análisis listo. Selecciona un tramo para escucharlo; escribe y guarda el proyecto para volver más tarde.';
+    status.textContent += harmonyNotice();
     if (restored && needsHarmonicMigration) persistProject().catch(() => {});
     busy = false; analyze.disabled = false; create.disabled = false; saveLab.disabled = false;
     editMode.disabled = !linkedSongId; stageMode.disabled = !linkedSongId;
@@ -905,12 +903,20 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
       decoded = await decodeLocalFile(selectedFile);
       waveform = buildWaveformEnvelope(decoded.pcm);
       status.textContent = `Audio decodificado · ${Math.round(decoded.durationMs / 1000)} s. Cargando analizador opcional…`;
+      // Re-analysing the same audio keeps the musician's chord decisions and sensitivity.
+      const previousHarmony = analysis?.harmony || null;
+      const warnings = [];
+      const stageLabels = { rhythm: 'tempo y pulsos', peaks: 'picos espectrales', harmony: 'armonía', done: 'resultado' };
       worker?.terminate(); worker = new Worker(ANALYSIS_WORKER_URL, { type: 'module' });
       worker.onmessage = ({ data }) => {
         if (data.type === 'ready') {
-          status.textContent = 'Essentia.js listo. Analizando tempo, pulsos y cromas…';
-          worker.postMessage({ ...decoded, type: 'analyse' }, [decoded.pcm.buffer]);
+          status.textContent = 'Essentia.js listo. Analizando tempo, pulsos y armonía…';
+          worker.postMessage({ ...decoded, type: 'analyse', sensitivity: previousHarmony?.sensitivity,
+            constraints: previousHarmony?.constraints || [] }, [decoded.pcm.buffer]);
+        } else if (data.type === 'progress') {
+          status.textContent = [`Analizando ${stageLabels[data.stage] || data.stage}… ${Math.round(data.fraction * 100)} %`, ...warnings].join('\n');
         } else if (data.type === 'warning') {
+          warnings.push(data.message);
           status.textContent += `\n${data.message}`;
         } else if (data.type === 'analysis') {
           data.waveform = waveform;
@@ -957,7 +963,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     micSwitchState.textContent = 'Iniciando…';
     liveStatus.textContent = 'Iniciando micrófono y analizador local…';
     liveScores = [];
-    liveChordStabilizer.reset(); liveChordResult = null;
+    liveChordTracker = createLiveChordTracker({ sensitivity: analysis?.harmony?.sensitivity || 'normal' });
+    liveVerifier.reset(); liveChordResult = null; liveVerdict = null;
     livePitchTracker.reset(); currentLiveNote = null;
     try {
       liveCapture = createMicCapture({
@@ -976,7 +983,9 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
             liveView?.setLiveFrame(null);
             liveRadar.update([], '');
             livePitchTracker.reset(); currentLiveNote = null;
-            liveChordStabilizer.reset(); liveChordResult = null;
+            // Low signal only lets the tracker's belief relax; no hard reset.
+            liveChordTracker.update({ usable: false, timestampMs: frame.observedPerfMs || performance.now() });
+            liveChordResult = null; liveVerdict = null; liveVerifier.reset();
             updateLiveNote(null);
             drawLiveSpectrum(null, null);
             liveGuess.textContent = liveInputQuality === 'clipping' ? 'Escucha: señal saturada' : 'Escucha: esperando señal clara';
@@ -984,8 +993,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
             return;
           }
           if (frame.observedPerfMs && mediaPlayer && !mediaPlayer.paused) {
-            const age = Math.max(0, performance.now() - frame.observedPerfMs);
-            frame.playbackPositionMs = Math.max(0, playbackPositionMs() - age);
+            frame.playbackPositionMs = mediaPositionAt(frame.observedPerfMs, { positionMs: playbackPositionMs(), perfNowMs: performance.now(),
+              playing: true, playbackRate: mediaPlayer.playbackRate });
           }
           const segment = segmentAt(Number.isFinite(frame.playbackPositionMs) ? frame.playbackPositionMs : playbackPositionMs());
           frame.affinity = segment?.chroma ? compareChroma(segment.chroma, frame.chroma) : null;
@@ -1002,8 +1011,13 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
               const centsFromHarmonic = Math.abs(1200 * Math.log2(ratio / harmonic));
               return centsFromHarmonic > 38;
             }).length : 0;
-          liveChordResult = liveChordStabilizer.update(frame.chroma, frame.observedPerfMs || performance.now(),
-            { bassPitchClass, fundamentalPitchClass, independentPeakCount });
+          const heardAtMs = frame.observedPerfMs || performance.now();
+          liveChordResult = liveChordTracker.update({ treble: frame.chroma, bass: frame.bassChroma, timestampMs: heardAtMs,
+            evidence: { bassPitchClass, fundamentalPitchClass, independentPeakCount } });
+          liveVerdict = referenceCheckbox.checked && analysis
+            ? liveVerifier.update({ expected: expectedChordsAt(Number.isFinite(frame.playbackPositionMs) ? frame.playbackPositionMs : playbackPositionMs()),
+              result: liveChordResult, timestampMs: heardAtMs })
+            : null;
           liveScores.push({ at: Date.now(), affinity: frame.affinity, frame });
           liveScores = liveScores.filter((item) => Date.now() - item.at < 5000).slice(-60);
           liveView?.setLiveFrame(frame);
@@ -1041,8 +1055,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     currentLiveNote = null;
     liveGuess.textContent = 'Escucha: —'; liveSimilarity.textContent = 'Afinidad armónica: —';
     liveTransition.textContent = 'Secuencia: —';
-    liveCompatibility.textContent = 'Compatibilidad con el acorde elegido: —';
-    liveChordStabilizer.reset(); liveChordResult = null;
+    liveCompatibility.textContent = 'Cotejo: —';
+    liveChordTracker.reset(); liveVerifier.reset(); liveChordResult = null; liveVerdict = null;
     updateLiveNote(null);
     drawLiveSpectrum(null, null);
     liveStatus.textContent = 'Micrófono apagado';
@@ -1108,8 +1122,8 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     try {
       await persistProject();
       const doc = buildLabSong({ title: title.value, artist: artist.value, durationMs: analysis.durationMs,
-        bpm: bpmValue, chordSuggestions: analysis.chordSuggestions,
-      uncertainChordCount: (analysis.harmonicRegions?.length || analysis.chordCandidates.length) - analysis.chordSuggestions.length,
+        bpm: bpmValue, chordSuggestions: analysis.chordSuggestions || [],
+        uncertainChordCount: (analysis.harmonicRegions || []).filter((region) => region.state === 'no-chord').length,
         audioAssetId: projectAudioAssetId, sections: labSections });
       const collision = await import('./importDialog.js').then(({ askCollision }) => askCollision);
       const result = await importSongV2Document(doc, collision);

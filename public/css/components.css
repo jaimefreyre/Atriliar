@@ -13,6 +13,9 @@
   :where(fieldset) { border: 0; padding: 0; min-inline-size: 0; }
   :where(button, input, select, textarea) { font: inherit; color: inherit; }
   :where(img, svg, canvas, video) { display: block; max-inline-size: 100%; }
+  /* `hidden` must win over any component's display (an !important in the
+     first layer beats every later layer), so no per-component [hidden] patches. */
+  [hidden]:not([hidden="until-found"]) { display: none !important; }
   /* Scoped to our components instead of a global `*` reset: widths below are
      percentages of the timeline, so padding and border must be included. */
   :where(.sp-topbar, .sp-canvas, .sp-inspector, .sp-dock, .sp-btn, .sp-chip, .sp-pad, .sp-bar, .sp-line,

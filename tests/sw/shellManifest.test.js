@@ -16,7 +16,7 @@ test('public/sw.js precachea exactamente los archivos del shell (npm run build:s
 test('el shell incluye todo módulo de la app y excluye depuración y herramientas pesadas', () => {
   const files = manifest.collectShellFiles();
   assert.ok(files.includes('/'));
-  assert.ok(files.includes('/js/music/chromaMatch.js'), 'faltó un módulo importado por el laboratorio');
+  assert.ok(files.includes('/js/harmony/harmonyTrack.js'), 'faltó un módulo importado por el laboratorio');
   assert.ok(files.includes('/js/generated/validateSongV2.js'));
   assert.ok(files.every((file) => !file.startsWith('/debug/') && !file.startsWith('/vendor/')));
   assert.ok(!files.includes('/sw.js') && !files.includes('/package.json'));
