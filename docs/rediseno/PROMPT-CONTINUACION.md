@@ -20,7 +20,7 @@ Documentos obligatorios, en este orden:
    - los reemplazos intencionales;
    - la arquitectura técnica;
    - las etapas E0–E8 con su cierre;
-   - el Anexo A (motor armónico), el Anexo B (migración de datos) y el Anexo C (dónde queda cada función actual).
+   - el Anexo A (motor armónico), el Anexo B (reinicio local de datos) y el Anexo C (dónde queda cada función actual).
 2. `docs/rediseno/E0-EVIDENCIA.md`, `EP-EVIDENCIA.md` y `E1-EVIDENCIA.md`: qué ya está hecho, cómo se verificó y qué límites quedaron.
 3. `public/debug/prototipo.html` + `public/debug/prototipo.js`: **el prototipo navegable aprobado**. Abrilo en `http://localhost:3100/debug/prototipo.html`. Cubre:
    - la biblioteca y los 5 modos;
@@ -34,7 +34,7 @@ Documentos obligatorios, en este orden:
 **Etapas cerradas:**
 - **E0:** transporte, service worker con manifiesto generado y marcas de tiempo del micrófono.
 - **EP:** sistema de diseño y prototipo.
-- **E1:** motor armónico v6 en `public/js/harmony/`. Es una sola pista de acordes con "Sensibilidad de cambios", y las ediciones del músico quedan como restricciones. Incluye la migración v5→v6, el rastreador en vivo y el banco de pruebas.
+- **E1:** motor armónico v6 en `public/js/harmony/`. Es una sola pista de acordes con "Sensibilidad de cambios", y las ediciones del músico quedan como restricciones. Incluye el rastreador en vivo y el banco de pruebas. Por pedido posterior del usuario, no se convierten análisis locales del motor anterior.
 
 **La app que ve el usuario todavía es la vieja.** El laboratorio es una página de ~1.200 líneas: `public/js/ui/audioDraftAssistant.js`, `audioAnalysisVisualizer.js`, `multitrackWorkspace.js` y `css/audio-draft.css`. Tu trabajo es reemplazarla por el diseño del prototipo.
 
@@ -54,15 +54,14 @@ Resumen de cada etapa. El detalle está en el plan y manda sobre este resumen.
   - `projects`, 1:1 con la canción, con clave `songId`;
   - `analyses`, por canción + fuente + versión del motor. Se escribe una vez por análisis, **nunca** en el autoguardado.
 
-  La versión de la base pasa de 3 a 4. Ya existe tolerancia a `VersionError` en `data/indexedDb.js`.
+  La versión de la base pasa de 3 a 4. En la primera actualización se vacían, en una sola transacción, todos los registros de stores pre-v4. No hay migración, respaldo automático ni conversión de análisis antiguos; el usuario indicó que esos datos se pueden eliminar. `SongDocument v2` no cambia.
 
   Archivos nuevos:
   - `data/projectRepo.js` y `data/projectModel.js`;
-  - `data/migrations/v4Projects.js`: función pura más ejecutor, fuera de `onupgradeneeded`, idempotente con `settings['migration:v4:lab:<id>']`, con reporte guardado y respaldo previo descargable;
   - `data/chartSync.js`: los acordes del cifrado son una **proyección determinista** de `analysis.harmony` (la pista v6), con ids estables `ch-<startMs>`, ancla a la palabra más cercana, `bassNote` en slash y automáticos marcados como estimados;
   - `data/backup.js`: respaldo JSON v2 con proyectos.
 
-  Cubrí cada caso del Anexo B. "Actualizar cifrado" actualiza **siempre la misma canción** y nunca crea duplicados. Hoy el usuario ya tiene "Vos también estabas verde" duplicada (v1 + v2).
+  Se verifican la creación, reapertura y guardado de proyectos nuevos. "Actualizar cifrado" actualiza **siempre la misma canción** y nunca crea duplicados. El Anexo B anterior de migración queda reemplazado por el reinicio local.
 - **E2b · Shell y biblioteca.** Crear:
   - `ui/components/dialogs.js`, con `<dialog>` nativo y avisos (toasts), que reemplaza los 17 `alert/confirm`;
   - `ui/shell/{router,appShell,dock,inspectorHost,keymap,legacyHost}.js`, con rutas `#/`, `#/cancion/<id>/<modo>` y recarga que conserva ruta y posición en pausa;

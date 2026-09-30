@@ -80,7 +80,9 @@ Cada etapa deja la app usable, termina con commit y evidencia, y se puede pausar
 
 **E1 — Motor armónico v6 + banco de pruebas (L).** Anexo A. Primero se extrae `audio/analysisPipeline.js` sin cambiar comportamiento y se mide el motor actual; después frente NNLS, decodificador, refinamiento, pista armónica v6, migración de proyectos v5 (las elecciones por región **y por pulso** pasan a restricciones) y rastreador en vivo. Los consumidores actuales se adaptan lo mínimo (leen la pista única; "Resolución" pasa a "Sensibilidad") para que el laboratorio actual ya muestre el motor nuevo; la UI definitiva llega en E3a. *Cierre:* umbrales del Anexo A en verde y reporte comparativo viejo vs nuevo.
 
-**E2a — Modelo unificado (M).** Stores `projects` y `analyses`; `data/projectRepo.js`, `data/projectModel.js`, `data/migrations/v4Projects.js` (función pura + ejecutor, con reporte y respaldo previo descargable), `data/chartSync.js`, respaldo JSON v2 con proyectos (`data/backup.js`). *Cierre:* cada caso del Anexo B probado; "Actualizar cifrado" nunca crea duplicados.
+**E2a — Modelo unificado (M).** Stores `projects` y `analyses`; `data/projectRepo.js`, `data/projectModel.js`, `data/chartSync.js`, respaldo JSON v2 con proyectos (`data/backup.js`). En el primer salto a v4 se eliminan una sola vez los registros locales pre-v4, según la enmienda siguiente. *Cierre:* un proyecto nuevo se guarda y abre sin duplicados; el cifrado sincroniza sin solapamientos.
+
+**Enmienda E2a solicitada por el usuario (2026-09-30):** no migrar ni importar registros anteriores. Al pasar a IndexedDB v4, limpiar una sola vez los datos locales pre-v4 y empezar con el modelo nuevo vacío; no generar respaldo previo de esos datos. Esta decisión reemplaza para E2a la migración y casos de Anexo B. Mantener el esquema SongDocument v2 y probar creación, guardado y sincronización de datos nuevos.
 
 **E2b — Sistema de diseño, shell y biblioteca (L).** Tokens y componentes; `ui/components/dialogs.js` y avisos en lugar de `alert/confirm`; `ui/shell/{router,appShell,dock,inspectorHost,keymap,legacyHost}.js`; `ui/library/libraryView.js` con "Nueva desde audio", búsqueda, estados y panel de almacenamiento; `app.js` queda como arranque corto. Las vistas viejas se alojan dentro del shell (modo embebido, su CSS inyectado solo mientras están montadas) hasta ser reemplazadas; bandera `ui:shell` con `?ui=legacy` de escape hasta E8. *Cierre:* toda función existente alcanzable por una ruta; recargar conserva ruta y posición.
 
@@ -171,19 +173,9 @@ Verificación con cifrado: esperado = regiones en `[p − 200, p + 150]` ms (p c
 
 **Archivos**: nuevos en `public/js/harmony/` (`fft`, `nnlsChroma`, `chromaFrontEnd`, `harmonySteps`, `chordVocabulary`, `chordDecoder`, `chordRefinement`, `keyProfile`, `harmonyTrack`, `liveChordTracker`, `harmonyMetrics`, `synthProgression`), `audio/analysisPipeline.js`, `audio/frameClock.js`, `scripts/lib/loadEssentiaNode.mjs`, `scripts/eval-harmony.mjs`, `public/debug/harmony-eval.html`. Se reescriben `audio/essentiaAnalysisWorker.js`, `liveHarmonyWorker.js`, `audio-worklet-processor.js`, `onsetWorker.js`, `micCapture.js`. Se eliminan `audio/harmonicSegmentation.js`, `liveChordStabilizer.js`, `beatHarmony.js` (lógica portada) y `matchChordTemplate`/`CHORD_FINGERPRINTS` (se conservan las utilidades de octavas y `MIDI_NOTE_FINGERPRINTS`). La prueba "una inversión sostenida parte la región aunque el acorde sea el mismo" cambia de sentido.
 
-## Anexo B — Migración de datos (E2a)
+## Anexo B — Reinicio local de datos (E2a)
 
-| Caso | Acción |
-|---|---|
-| Laboratorio con canción | Proyecto desde el laboratorio; análisis a `analyses`. Si su letra/tab difieren del cifrado, se conserva el cifrado y lo del laboratorio queda pendiente con insignia "Importar". |
-| Laboratorio sin canción (o con canción borrada) | Se crea el cifrado con id estable: secciones, una línea por letra no vacía, tabs, acordes proyectados (incluidos automáticos), `estimated` con avisos. |
-| Sin audio ni análisis | Se omite y se informa en el reporte. |
-| Dos laboratorios para una canción | El más reciente es el principal; los otros quedan como borradores marcados. |
-| Canciones duplicadas `audio-draft-*` | Nunca se borran solas: insignia "posible duplicado" y diálogo Conservar / Eliminar / Abrir, con "eliminar idénticos". |
-| Canción sin laboratorio | Proyecto creado al abrirla; sus acordes entran como restricciones confirmadas. |
-| Canciones v1 | Sin cambios; grupo con "Convertir". |
-
-Fuera de `onupgradeneeded`, idempotente (`settings['migration:v4:lab:<id>']`), con reporte guardado y respaldo previo descargable (songsV2 + labProjects, sin audio). `labProjects` queda congelado; no se borra ningún store hasta después de E8.
+En la primera apertura que actualiza una base anterior a v4, IndexedDB vacía sus registros existentes en la misma transacción de actualización y crea los stores del modelo vigente. No hay migración, importación automática ni respaldo de los registros anteriores. Después de iniciar, los proyectos, análisis y canciones nuevos se guardan con el modelo actual. El contenido de un archivo que el usuario importe explícitamente es una importación nueva, no una recuperación de la base local antigua.
 
 ## Anexo C — Dónde queda cada función actual
 - **Autopsia**: video como fuente; EQ 3 bandas y velocidad (popover "Sonido" del dock); reproducir tramo o sección (Enter o clic en el carril); título/artista/BPM (barra superior) y BPM/compás/downbeat (carril de grilla); análisis con progreso y avisos; vistas croma/graves/agudos (carril Espectro); agrupar pulsos (compás del proyecto); evidencia, croma vs plantilla y picos (cajón); selector de acordes y catálogo manual (ficha); guitarra con picos, bajo, piano, tab y escala (panel de instrumento); notas MIDI manuales (carril Notas + diapasón); sintetizador de líneas MIDI (carril Notas, sobre el reloj común); círculo de quintas (inspector) y recorrido armónico (carril Notas); modelo 4/6 stems y guía de instalación (diálogo Separar); importar stems (Fuentes); reproductor, mapa armónico y análisis por stem (carriles de stem); notas de stem a MIDI, tramo original y desde/hasta numérico (acciones de la selección).

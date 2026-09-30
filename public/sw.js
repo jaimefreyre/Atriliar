@@ -1,5 +1,5 @@
 // @generated-shell-begin (npm run build:shell; no editar a mano)
-const SHELL_CACHE = 'stageprompter-shell-6c26170695cf';
+const SHELL_CACHE = 'stageprompter-shell-bd78972c2f3b';
 const SHELL = [
   '/',
   '/css/audio-draft.css',
@@ -35,10 +35,13 @@ const SHELL = [
   '/js/audio/silenceGate.js',
   '/js/audio/waveformEnvelope.js',
   '/js/data/backup.js',
+  '/js/data/chartSync.js',
   '/js/data/importSongV2.js',
   '/js/data/indexedDb.js',
   '/js/data/legacyImporter.js',
   '/js/data/offline.js',
+  '/js/data/projectModel.js',
+  '/js/data/projectRepo.js',
   '/js/data/reviewState.js',
   '/js/data/songSemantics.js',
   '/js/data/songValidator.js',

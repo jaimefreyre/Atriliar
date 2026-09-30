@@ -8,6 +8,8 @@ StagePrompter es una aplicación web local para estudiar una canción, relaciona
 
 No es un servicio en la nube: al separar, el navegador envía el audio al servidor Node que corre en esta misma computadora, y ese servidor ejecuta Demucs localmente. El navegador conserva los proyectos y medios en IndexedDB.
 
+Desde IndexedDB v4, cada canción tiene un proyecto local asociado y sus análisis se guardan aparte por origen y versión del motor. La primera apertura de esta versión limpia los registros locales anteriores de StagePrompter; no importa ni convierte análisis guardados por versiones previas.
+
 ## 2. Requisitos
 
 ### Básicos
@@ -248,7 +250,9 @@ flowchart LR
 
 ## 10. Guardado, respaldo y privacidad
 
-Los datos se guardan en IndexedDB del navegador y del origen actual. Si borras los datos del sitio, cambias de puerto/navegador o mueves el proyecto a otro equipo, el contenido local no se transfiere automáticamente. El respaldo de canciones JSON actual no incluye los audios ni todos los proyectos del laboratorio. Exportar/importar un paquete completo de proyecto con medios es una mejora pendiente.
+Los datos se guardan en IndexedDB del navegador y del origen actual. Si borras los datos del sitio, cambias de puerto/navegador o mueves el proyecto a otro equipo, el contenido local no se transfiere automáticamente. El respaldo JSON v2 incluye canciones, proyectos y análisis, pero no los audios; los assets referenciados deben volver a vincularse.
+
+**Reinicio de E2a:** al abrir por primera vez una base anterior a v4, la actualización elimina sus registros locales (canciones, análisis de laboratorio, preferencias y assets) y crea los stores nuevos vacíos. Es intencional: esta versión no recupera ni convierte esos datos. La aplicación lo comunica en el estado de almacenamiento.
 
 La app no sube el micrófono ni el audio a un servicio remoto. La única descarga de red asociada a la separación es la del modelo cuando todavía no está en caché. El servidor guarda temporalmente el original recibido y la salida Demucs bajo la carpeta temporal del sistema; los stems que se usan en el laboratorio se descargan luego al navegador.
 
@@ -297,7 +301,8 @@ La app no sube el micrófono ni el audio a un servicio remoto. La única descarg
 - public/js/harmony/: reconocedor de acordes (croma NNLS, decodificador, refinamiento, pista armónica, seguimiento en vivo, métricas).
 - scripts/eval-harmony.mjs y public/debug/harmony-eval.html: banco de pruebas del reconocedor.
 - public/js/ui/multitrackWorkspace.js: autopsia multipista y Loopera.
-- public/js/data/indexedDb.js: persistencia local.
+- public/js/data/indexedDb.js: stores v4, reinicio inicial y persistencia local.
+- public/js/data/projectRepo.js, projectModel.js y chartSync.js: proyectos, análisis separados y actualización idempotente del cifrado.
 - docs/LABORATORIO-V2.md: recorrido y decisiones del laboratorio.
 - tests/: pruebas automatizadas de análisis, armonía, segmentación, MIDI y utilidades.
 - docs/rediseno/: plan por etapas del rediseño y evidencia de cada etapa.

@@ -1,7 +1,8 @@
 ﻿import { getAllSongs, saveSong, deleteSong, getAllSongsV2, deleteSongV2, getSongV2 } from './data/indexedDb.js';
 import { validateSong, detectSongFormat } from './data/songValidator.js';
-import { getAllLabProjects, deleteLabProject } from './data/indexedDb.js';
+import { getAllProjects, getAllAnalyses } from './data/indexedDb.js';
 import { buildBackup, isBackupDocument } from './data/backup.js';
+import { deleteWorkspace, ensureProjectForSong, importProjectBackupData } from './data/projectRepo.js';
 import { initializeOffline } from './data/offline.js';
 import { migrateLegacySong } from './data/legacyImporter.js';
 import { importSongV2Document } from './data/importSongV2.js';
@@ -12,6 +13,11 @@ import { openAudioDraftAssistant } from './ui/audioDraftAssistant.js';
 import { exitStageMode, adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, nextChord, changeScale, toggleHarmony, toggleTab } from './stage/stageMode.js';
 
 window.addEventListener('stageprompter:db', (e) => {
+  if (e.detail.kind === 'reset') {
+    const status = document.getElementById('storage-status');
+    if (status) status.textContent = e.detail.message;
+    return;
+  }
   alert(`Base de datos: ${e.detail.message}`);
 });
 
@@ -20,7 +26,7 @@ window.stage = { adjustTranspose, adjustFontSize, toggleAutoScroll, prevChord, n
 
 let songs = [];
 let songsV2 = [];
-let labProjects = [];
+let projects = [];
 
 function buildBadge(text, extraClass) {
   const span = document.createElement('span');
@@ -94,8 +100,8 @@ function renderV2SongItem(song) {
 
   const actions = document.createElement('div');
   actions.className = 'song-actions';
-  const linkedLab = labProjects.find((project) => project.songId === song.id);
-  if (linkedLab) actions.appendChild(buildActionButton('🎧 LABORATORIO', 'open-lab', linkedLab.id));
+  const linkedLab = projects.find((project) => project.songId === song.id);
+  if (linkedLab) actions.appendChild(buildActionButton('🎧 LABORATORIO', 'open-lab', linkedLab.projectId));
   else if (song.audio) actions.appendChild(buildActionButton('🎧 ANALIZAR AUDIO', 'open-lab-song', song.id));
   actions.appendChild(buildActionButton('▶ REPRODUCIR', 'play-v2', song.id, 'btn-stage'));
   actions.appendChild(buildActionButton('🎚️ CALIBRAR', 'calibrate-v2', song.id));
@@ -107,27 +113,24 @@ function renderV2SongItem(song) {
 async function loadLibrary() {
   try { songs = await getAllSongs(); } catch (err) { console.error('❌ Error al cargar canciones v1:', err); songs = []; }
   try { songsV2 = await getAllSongsV2(); } catch (err) { console.error('❌ Error al cargar canciones v2:', err); songsV2 = []; }
-  try { labProjects = await getAllLabProjects(); } catch (err) { console.error('❌ Error al cargar laboratorios:', err); labProjects = []; }
+  try { projects = await getAllProjects(); } catch (err) { console.error('❌ Error al cargar proyectos:', err); projects = []; }
 
   const projectList = document.getElementById('lab-project-list');
   projectList.replaceChildren();
-  if (!labProjects.length) {
+  if (!projects.length) {
     const empty = document.createElement('p'); empty.className = 'empty';
     empty.textContent = 'Carga un audio para crear un mapa que podrás volver a estudiar y editar.';
     projectList.append(empty);
   }
-  labProjects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).forEach((project) => {
+  projects.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')).forEach((project) => {
     const item = document.createElement('div'); item.className = 'song-item';
     const info = document.createElement('div'); info.className = 'song-info';
     const name = document.createElement('strong'); name.textContent = project.title || 'Análisis sin título';
     const subtitle = document.createElement('span');
-    const chordCount = project.analysis?.harmony
-      ? project.analysis.harmony.regions.filter((region) => region.state === 'harmony').length
-      : project.analysis?.harmonicRegions?.length || project.analysis?.chordCandidates?.length || 0;
-    subtitle.textContent = `${project.artist || 'Artista sin indicar'} · ${Math.round((project.analysis?.durationMs || 0) / 1000)} s · ${chordCount} acordes`;
-    info.append(name, subtitle, buildBadge('Laboratorio v2'));
+    subtitle.textContent = `${project.artist || 'Artista sin indicar'} · ${project.analysisRefs?.length ? 'Análisis guardado' : 'Sin análisis'}`;
+    info.append(name, subtitle, buildBadge('Proyecto v4'));
     const actions = document.createElement('div'); actions.className = 'song-actions';
-    actions.append(buildActionButton('Abrir laboratorio', 'open-lab', project.id, 'btn-stage'), buildActionButton('🗑️', 'delete-lab', project.id, 'btn-danger'));
+    actions.append(buildActionButton('Abrir laboratorio', 'open-lab', project.projectId, 'btn-stage'), buildActionButton('🗑️', 'delete-lab', project.projectId, 'btn-danger'));
     item.append(info, actions); projectList.append(item);
   });
   projectList.onclick = async (event) => {
@@ -135,7 +138,7 @@ async function loadLibrary() {
     const id = button.dataset.id;
     if (button.dataset.action === 'open-lab') await openAudioDraftAssistant({ projectId: id, onClose: loadLibrary });
     if (button.dataset.action === 'delete-lab' && confirm('¿Eliminar este proyecto de análisis? La canción guardada se conservará.')) {
-      await deleteLabProject(id); await loadLibrary();
+      await deleteWorkspace(id); await loadLibrary();
     }
   };
 
@@ -167,10 +170,10 @@ async function loadLibrary() {
       if (confirm('¿Eliminar esta canción v2?')) { await deleteSongV2(id); loadLibrary(); }
     } else if (action === 'calibrate-v2') {
       const song = songsV2.find(s => s.id === id);
-      if (song) await openCalibrationEditor(song, loadLibrary);
+      if (song) { await ensureProjectForSong(song); await openCalibrationEditor(song, loadLibrary); }
     } else if (action === 'play-v2') {
       const song = songsV2.find(s => s.id === id);
-      if (song) await openPlayerView(song, loadLibrary);
+      if (song) { await ensureProjectForSong(song); await openPlayerView(song, loadLibrary); }
     } else if (action === 'open-lab') {
       await openAudioDraftAssistant({ projectId: id, onClose: loadLibrary });
     } else if (action === 'open-lab-song') {
@@ -211,7 +214,8 @@ document.getElementById('btn-audio-draft').addEventListener('click', async () =>
 });
 
 document.getElementById('btn-export-backup').addEventListener('click', async () => {
-  const backup = buildBackup({ legacySongs: await getAllSongs(), songsV2: await getAllSongsV2() });
+  const backup = buildBackup({ legacySongs: await getAllSongs(), songsV2: await getAllSongsV2(),
+    projects: await getAllProjects(), analyses: await getAllAnalyses() });
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -294,9 +298,12 @@ fileInput.addEventListener('change', async (e) => {
 
   if (isBackupDocument(raw)) {
     let imported = 0; let skipped = 0; let invalid = 0;
+    const songIdMap = new Map();
     for (const doc of raw.songsV2) {
       const result = await importSongV2Document(doc, askCollision);
-      if (result.status === 'created' || result.status === 'replaced' || result.status === 'duplicated') imported++;
+      if (result.status === 'created' || result.status === 'replaced' || result.status === 'duplicated') {
+        imported++; songIdMap.set(doc.id, result.id);
+      }
       else if (result.status === 'invalid') invalid++;
       else skipped++;
     }
@@ -313,8 +320,10 @@ fileInput.addEventListener('change', async (e) => {
       await saveSong(legacy);
       imported++;
     }
+    const projectData = await importProjectBackupData({ projects: raw.projects || [], analyses: raw.analyses || [], songIdMap });
     await showInfo('Respaldo procesado', [
       `Canciones importadas: ${imported}`, `Omitidas: ${skipped}`, `Inválidas: ${invalid}`,
+      `Proyectos importados: ${projectData.importedProjects}`, `Análisis importados: ${projectData.importedAnalyses}`,
       'El JSON no contiene audio. Las canciones que lo referencian necesitan volver a vincular el archivo.',
     ]);
     await loadLibrary();

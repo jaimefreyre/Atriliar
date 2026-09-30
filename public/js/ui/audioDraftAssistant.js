@@ -1,6 +1,7 @@
 import { decodeLocalFile } from '../audio/decodeLocalFile.js';
-import { importSongV2Document } from '../data/importSongV2.js';
-import { getSongV2, getLabProject, getAsset, saveAsset, saveLabProject, saveLabProjectWithAsset } from '../data/indexedDb.js';
+import { getSongV2, getAsset } from '../data/indexedDb.js';
+import { ensureProjectForSong, getWorkspace, saveWorkspaceFromLab } from '../data/projectRepo.js';
+import { labSectionsFromSong } from '../data/projectModel.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
 import { openPlayerView } from './playerView.js';
 import { cacheOptionalAudioTools } from '../data/offline.js';
@@ -12,8 +13,7 @@ import { createLivePitchTracker } from '../audio/livePitchTracker.js';
 import { expandPitchClassesAcrossOctaves } from '../audio/chordTemplateMatch.js';
 import { compareChroma } from '../audio/chromaSimilarity.js';
 import { getAuditionRange } from '../audio/auditionRange.js';
-import { migrateAnalysisToV6, isProvisionalHarmony } from '../harmony/analysisHarmony.js';
-import { initialLabSections, sectionAt, splitLabSection, buildLabSong } from '../audio/labComposition.js';
+import { initialLabSections, sectionAt, splitLabSection } from '../audio/labComposition.js';
 import { buildWaveformEnvelope } from '../audio/waveformEnvelope.js';
 import { createLiveHarmonicRadar } from './harmonicCircle.js';
 import { getChordTones } from '../music/harmony.js';
@@ -343,24 +343,29 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
         mime: selectedFile.type || 'application/octet-stream', bytes: selectedFile.size,
         duration: (analysis?.durationMs || 0) / 1000 };
     }
+    // A project is created only once it has a valid song timeline (after
+    // analysis, or when it is already attached to an existing song).
+    if (!analysis && !linkedSongId) return Promise.resolve();
     const snapshot = projectSnapshot();
     const assetToSave = pendingAsset;
-    pendingAsset = null;
     saveQueue = saveQueue.catch(() => {}).then(async () => {
-      if (assetToSave) await saveLabProjectWithAsset(snapshot, assetToSave);
-      else await saveLabProject(snapshot);
+      const result = await saveWorkspaceFromLab(snapshot, { asset: assetToSave });
+      if (result.status === 'incomplete') return result;
+      if (result.status === 'invalid') throw new Error(result.errors.map((item) => `${item.instancePath}: ${item.message}`).join('\n'));
+      linkedSongId = result.songId;
+      projectId = result.project.projectId;
+      projectAudioAssetId = result.project.audioAssetId || projectAudioAssetId;
+      if (assetToSave) pendingAsset = null;
+      return result;
     });
-    return saveQueue.then(() => { status.textContent = `Laboratorio guardado en este dispositivo.${harmonyNotice()}`; }, (error) => {
-      if (assetToSave) pendingAsset = assetToSave;
+    return saveQueue.then((result) => {
+      status.textContent = result?.status === 'incomplete'
+        ? result.message
+        : 'Laboratorio guardado en este dispositivo.';
+    }, (error) => {
       status.textContent = `No se pudo guardar el laboratorio: ${error?.message || error}`;
       throw error;
     });
-  }
-  /** Kept on every status update while the chords still come from a pre-v6 analysis. */
-  function harmonyNotice() {
-    if (!isProvisionalHarmony(analysis)) return '';
-    const kept = analysis.harmonyMigration?.keptChoices || 0;
-    return `\nAcordes convertidos del motor anterior${kept ? ` (${kept} elecciones tuyas conservadas)` : ''}. Pulsa «Analizar archivo» para usar el motor nuevo: tus acordes se conservan.`;
   }
   function scheduleProjectSave() {
     if (!analysis && !selectedFile && !multitrackState.stems?.length && !multitrackState.loop?.tracks?.length) return;
@@ -824,15 +829,10 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     const confirmedCount = chords.filter((chord) => chord.confirmed).length;
     const unclear = regions.filter((region) => region.state === 'no-chord').length;
     const sensitivity = { estable: 'Estable', normal: 'Normal', detallada: 'Detallada' }[analysis.harmony?.sensitivity] || 'sin pista armónica';
-    preview.textContent = `${selectedFile?.name || 'Pista no vinculada'}\nDuración: ${(analysis.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(analysis.bpm) ? analysis.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${analysis.beats?.length || 0}\nAcordes: ${chords.length} (${confirmedCount} confirmados · ${chords.length - confirmedCount} estimados)${unclear ? ` · ${unclear} tramos sin acorde claro` : ''}\nSensibilidad de cambios: ${sensitivity}${isProvisionalHarmony(analysis) ? ' · convertido del motor anterior' : ''}`;
+    preview.textContent = `${selectedFile?.name || 'Pista no vinculada'}\nDuración: ${(analysis.durationMs / 1000).toFixed(1)} s\nBPM sugerido: ${Number.isFinite(analysis.bpm) ? analysis.bpm.toFixed(1) : 'no disponible'}\nPulsos detectados: ${analysis.beats?.length || 0}\nAcordes: ${chords.length} (${confirmedCount} confirmados · ${chords.length - confirmedCount} estimados)${unclear ? ` · ${unclear} tramos sin acorde claro` : ''}\nSensibilidad de cambios: ${sensitivity}`;
   }
   function showAnalysis(data, { restored = false } = {}) {
-    // Pre-v6 analyses get a provisional track from their stored chroma; every
-    // chord the musician picked (per region or per beat) becomes a constraint.
-    const needsHarmonicMigration = !data.harmony && data.chordCandidates?.length > 0;
-    if (needsHarmonicMigration) migrateAnalysisToV6(data);
     analysis = data;
-    if (needsHarmonicMigration && !restored) scheduleProjectSave();
     if (!labSections.length) labSections = initialLabSections(analysis.durationMs);
     if (!labSections.some((section) => section.id === selectedSectionId)) selectedSectionId = labSections[0]?.id || null;
     refreshAnalysisSummary(); renderSections();
@@ -890,8 +890,6 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     status.textContent = restored
       ? 'Análisis recuperado. Selecciona un tramo para escucharlo o edita la estructura y la letra.'
       : 'Análisis listo. Selecciona un tramo para escucharlo; escribe y guarda el proyecto para volver más tarde.';
-    status.textContent += harmonyNotice();
-    if (restored && needsHarmonicMigration) persistProject().catch(() => {});
     busy = false; analyze.disabled = false; create.disabled = false; saveLab.disabled = false;
     editMode.disabled = !linkedSongId; stageMode.disabled = !linkedSongId;
   }
@@ -1121,17 +1119,9 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     busy = true; create.disabled = true;
     try {
       await persistProject();
-      const doc = buildLabSong({ title: title.value, artist: artist.value, durationMs: analysis.durationMs,
-        bpm: bpmValue, chordSuggestions: analysis.chordSuggestions || [],
-        uncertainChordCount: (analysis.harmonicRegions || []).filter((region) => region.state === 'no-chord').length,
-        audioAssetId: projectAudioAssetId, sections: labSections });
-      const collision = await import('./importDialog.js').then(({ askCollision }) => askCollision);
-      const result = await importSongV2Document(doc, collision);
-      if (result.status === 'invalid') throw new Error(result.errors.map((item) => `${item.instancePath}: ${item.message}`).join('\n'));
-      if (result.status === 'cancelled') { busy = false; create.disabled = false; return; }
-      linkedSongId = result.id;
-      await persistProject();
-      const saved = await getSongV2(result.id);
+      if (!linkedSongId) throw new Error('No se pudo crear el documento musical del proyecto.');
+      const saved = await getSongV2(linkedSongId);
+      if (!saved) throw new Error('No se encontró la canción creada para este proyecto.');
       if (!await cleanUp()) throw new Error('No se pudo cerrar el laboratorio porque falló el guardado.');
       await openCalibrationEditor(saved, () => openAudioDraftAssistant({ projectId, onClose }));
     } catch (error) {
@@ -1151,12 +1141,16 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   }
   if (existingProjectId) {
     try {
-      const project = await getLabProject(existingProjectId);
+      const workspace = await getWorkspace(existingProjectId);
+      const project = workspace?.project;
       if (!project) throw new Error('No se encontró el proyecto de laboratorio.');
       title.value = project.title || ''; artist.value = project.artist || '';
       bpm.value = Number.isFinite(project.bpm) ? String(project.bpm) : '';
-      labSections = project.sections?.length ? project.sections : (project.analysis?.durationMs ? initialLabSections(project.analysis.durationMs) : []);
+      labSections = workspace.song
+        ? labSectionsFromSong(workspace.song, project.sectionIdMap)
+        : (project.sections?.length ? structuredClone(project.sections) : []);
       selectedSectionId = project.selectedSectionId || null;
+      if (!labSections.some((section) => section.id === selectedSectionId)) selectedSectionId = labSections[0]?.id || null;
       projectAudioAssetId = project.audioAssetId || null;
       linkedSongId = project.songId || null;
       multitrackView.restoreState({ stems: project.stems || [], loop: project.loop || {} });
@@ -1166,7 +1160,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
         else transportStatus.textContent = 'El análisis se recuperó, pero falta el archivo de audio local.';
       } else transportStatus.textContent = 'Este análisis se guardó sin pista. Elige un archivo y vuelve a analizarlo para escuchar.';
       multitrackView.setSource();
-      if (project.analysis) showAnalysis(project.analysis, { restored: true });
+      if (workspace.analysisRecord?.analysis) showAnalysis(workspace.analysisRecord.analysis, { restored: true });
       else {
         saveLab.disabled = false;
         status.textContent = selectedFile
@@ -1178,9 +1172,14 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     try {
       const song = await getSongV2(songId);
       if (!song) throw new Error('No se encontró la canción.');
+      const project = await ensureProjectForSong(song);
       title.value = song.metadata.title; artist.value = song.metadata.artist || '';
       bpm.value = String(song.metadata.bpm);
+      labSections = labSectionsFromSong(song, project.sectionIdMap);
+      selectedSectionId = project.selectedSectionId || labSections[0]?.id || null;
+      if (!labSections.some((section) => section.id === selectedSectionId)) selectedSectionId = labSections[0]?.id || null;
       linkedSongId = song.id;
+      projectId = project.projectId;
       const asset = song.audio?.assetId ? await getAsset(song.audio.assetId) : null;
       if (!asset?.blob) throw new Error('Esta canción no tiene el audio local disponible para analizar.');
       projectAudioAssetId = asset.id;

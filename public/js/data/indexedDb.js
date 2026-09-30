@@ -1,12 +1,14 @@
 const DB_NAME = 'StagePrompterDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
-const STORE_SONGS = 'songs';       // v1 legacy, contenido intacto
+const STORE_SONGS = 'songs';       // nuevos imports explícitos del formato legacy v1
 const STORE_SONGS_V2 = 'songsV2';
 const STORE_ASSETS = 'assets';
 const STORE_SETLISTS = 'setlists';
 const STORE_SETTINGS = 'settings';
 const STORE_LAB_PROJECTS = 'labProjects';
+const STORE_PROJECTS = 'projects';
+const STORE_ANALYSES = 'analyses';
 
 let dbPromise = null;
 
@@ -37,17 +39,39 @@ function getDB() {
 function openDatabase(version) {
   return new Promise((resolve, reject) => {
     const request = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
+    let resetPreV4Data = false;
 
-    // Solo crea stores acá; nunca migra datos dentro de onupgradeneeded.
-    // Idempotente para oldVersion 0 (DB nueva) y 1 (solo tenía 'songs').
+    // El esquema se actualiza en la transacción de versión. El reinicio de
+    // registros pre-v4 fue pedido expresamente; no se importan datos previos.
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
+      // E2a deliberately starts from a clean local workspace. On the one-time
+      // v4 upgrade, discard pre-v4 records rather than importing old analyses
+      // into the new model. The stores themselves remain available to current
+      // code; no cleanup is repeated once the database is at v4.
+      if (e.oldVersion > 0 && e.oldVersion < 4) {
+        const upgrade = e.target.transaction;
+        for (const name of Array.from(db.objectStoreNames)) upgrade.objectStore(name).clear();
+        resetPreV4Data = true;
+      }
       if (!db.objectStoreNames.contains(STORE_SONGS)) db.createObjectStore(STORE_SONGS, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(STORE_SONGS_V2)) db.createObjectStore(STORE_SONGS_V2, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(STORE_ASSETS)) db.createObjectStore(STORE_ASSETS, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(STORE_SETLISTS)) db.createObjectStore(STORE_SETLISTS, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
       if (!db.objectStoreNames.contains(STORE_LAB_PROJECTS)) db.createObjectStore(STORE_LAB_PROJECTS, { keyPath: 'id' });
+      // Stores del proyecto unificado. `labProjects` queda vacío tras el
+      // reinicio v4 y ya no recibe nuevas escrituras.
+      if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+        const projects = db.createObjectStore(STORE_PROJECTS, { keyPath: 'songId' });
+        projects.createIndex('updatedAt', 'updatedAt', { unique: false });
+        projects.createIndex('projectId', 'projectId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_ANALYSES)) {
+        const analyses = db.createObjectStore(STORE_ANALYSES, { keyPath: ['songId', 'source', 'engineVersion'] });
+        analyses.createIndex('songId', 'songId', { unique: false });
+        analyses.createIndex('updatedAt', 'updatedAt', { unique: false });
+      }
     };
 
     request.onsuccess = (e) => {
@@ -58,6 +82,7 @@ function openDatabase(version) {
         dbPromise = null;
         notifyDbEvent('versionchange', 'La base de datos cambió en otra pestaña. Recargá esta página antes de guardar algo más.');
       };
+      if (resetPreV4Data) notifyDbEvent('reset', 'Actualización E2a: los datos locales anteriores se eliminaron para iniciar el modelo v4.');
       resolve(db);
     };
 
@@ -206,4 +231,58 @@ export async function getSetting(key) {
 }
 export async function saveSetting(key, value) {
   return runInStore(STORE_SETTINGS, 'readwrite', s => s.put({ key, value }));
+}
+
+// --- v4 project workspace and separately-versioned analyses ---
+export async function getAllProjects() {
+  return runInStore(STORE_PROJECTS, 'readonly', s => s.getAll());
+}
+export async function getProject(songId) {
+  return runInStore(STORE_PROJECTS, 'readonly', s => s.get(songId));
+}
+export async function getProjectById(projectId) {
+  return runInStore(STORE_PROJECTS, 'readonly', s => s.index('projectId').get(projectId));
+}
+export async function saveProject(project) {
+  return runInStore(STORE_PROJECTS, 'readwrite', s => s.put(project));
+}
+export async function deleteProject(songId) {
+  return runInStore(STORE_PROJECTS, 'readwrite', s => s.delete(songId));
+}
+export async function getAllAnalyses() {
+  return runInStore(STORE_ANALYSES, 'readonly', s => s.getAll());
+}
+export async function getAnalysesForSong(songId) {
+  return runInStore(STORE_ANALYSES, 'readonly', s => s.index('songId').getAll(songId));
+}
+export async function getAnalysis(songId, source, engineVersion) {
+  return runInStore(STORE_ANALYSES, 'readonly', s => s.get([songId, source, engineVersion]));
+}
+export async function saveAnalysis(analysis) {
+  return runInStore(STORE_ANALYSES, 'readwrite', s => s.put(analysis));
+}
+export async function deleteAnalysis(songId, source, engineVersion) {
+  return runInStore(STORE_ANALYSES, 'readwrite', s => s.delete([songId, source, engineVersion]));
+}
+/** Atomic v4 write for chart synchronization and its project provenance. */
+export async function saveSongProjectAnalysis({ song, project, analysis }) {
+  const stores = [STORE_SONGS_V2, STORE_PROJECTS];
+  if (analysis) stores.push(STORE_ANALYSES);
+  return runInStores(stores, 'readwrite', (byName) => {
+    if (song) byName[STORE_SONGS_V2].put(song);
+    if (project) byName[STORE_PROJECTS].put(project);
+    if (analysis) byName[STORE_ANALYSES].put(analysis);
+  });
+}
+/** Save a newly analyzed workspace and its local audio asset as one commit. */
+export async function saveProjectBundle({ song, project, analysis = null, asset = null }) {
+  const stores = [STORE_SONGS_V2, STORE_PROJECTS];
+  if (analysis) stores.push(STORE_ANALYSES);
+  if (asset) stores.push(STORE_ASSETS);
+  return runInStores(stores, 'readwrite', (byName) => {
+    byName[STORE_SONGS_V2].put(song);
+    byName[STORE_PROJECTS].put(project);
+    if (analysis) byName[STORE_ANALYSES].put(analysis);
+    if (asset) byName[STORE_ASSETS].put(asset);
+  });
 }
