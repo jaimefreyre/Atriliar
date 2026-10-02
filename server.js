@@ -50,16 +50,16 @@ function runSeparation(job, inputPath) {
   });
   job.process = child;
   let tail = '';
-  child.stdout.on('data', (chunk) => {
+  const updateOutput = (chunk) => {
     tail = `${tail}${chunk.toString()}`.slice(-3000);
-    const latest = tail.split(/\r?\n/).filter(Boolean).at(-1);
-    if (latest) job.message = latest.slice(0, 300);
-  });
-  child.stderr.on('data', (chunk) => {
-    tail = `${tail}${chunk.toString()}`.slice(-3000);
-    const latest = tail.split(/\r?\n/).filter(Boolean).at(-1);
-    if (latest) job.message = latest.slice(0, 300);
-  });
+    const latest = tail.split(/[\r\n]+/).map((line) => line.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').trim()).filter(Boolean).at(-1);
+    if (!latest) return;
+    const progress = latest.match(/(\d{1,3}(?:\.\d+)?)%\s*\|/);
+    if (progress) job.progress = Math.max(0, Math.min(100, Number(progress[1])));
+    job.message = latest.slice(-300);
+  };
+  child.stdout.on('data', updateOutput);
+  child.stderr.on('data', updateOutput);
   child.on('error', (error) => { job.status = 'failed'; job.message = error.message; job.process = null; });
   child.on('close', async (code) => {
     job.process = null;
@@ -81,6 +81,7 @@ function runSeparation(job, inputPath) {
     if (!stems.length) { job.status = 'failed'; job.message = 'Demucs terminó, pero no se encontraron sus pistas de salida.'; return; }
     job.stems = stems;
     job.status = 'completed';
+    job.progress = 100;
     job.message = `Separación terminada · ${stems.length} pistas.`;
     job.completedAt = Date.now();
   });
@@ -115,7 +116,7 @@ async function acceptSeparation(req, res, model, extension) {
   output.on('finish', () => {
     if (rejected) return;
     if (!bytes) { fs.promises.rm(jobDir, { recursive: true, force: true }).catch(() => {}); return json(res, 400, { error: 'El archivo recibido está vacío.' }); }
-    const job = { id, model, outputDir, status: 'queued', message: 'Audio recibido; iniciando separación local.', createdAt: Date.now(), stems: [] };
+    const job = { id, model, outputDir, status: 'queued', progress: 0, message: 'Audio recibido; iniciando separación local.', createdAt: Date.now(), stems: [] };
     SEPARATOR_JOBS.set(id, job);
     json(res, 202, { id, status: job.status, message: job.message });
     runSeparation(job, inputPath);
@@ -150,7 +151,7 @@ const server = http.createServer((req, res) => {
   const jobStatusMatch = pathname.match(/^\/api\/separate\/([\da-f-]{36})$/i);
   if (jobStatusMatch && req.method === 'GET') {
     const job = SEPARATOR_JOBS.get(jobStatusMatch[1]);
-    return job ? json(res, 200, { id: job.id, status: job.status, message: job.message, stems: job.stems })
+    return job ? json(res, 200, { id: job.id, status: job.status, progress: job.progress, message: job.message, stems: job.stems })
       : json(res, 404, { error: 'No se encontró este proceso de separación.' });
   }
   const stemMatch = pathname.match(/^\/api\/stems\/([\da-f-]{36})\/(vocals|drums|bass|other|guitar|piano)$/i);

@@ -1,5 +1,5 @@
 import { decodeLocalFile } from '../audio/decodeLocalFile.js';
-import { getSongV2, getAsset } from '../data/indexedDb.js';
+import { getSongV2, getAsset, saveAsset } from '../data/indexedDb.js';
 import { ensureProjectForSong, getWorkspace, saveWorkspaceFromLab } from '../data/projectRepo.js';
 import { labSectionsFromSong } from '../data/projectModel.js';
 import { openCalibrationEditor } from './calibrationEditor.js';
@@ -41,6 +41,10 @@ function createAssetId() {
 export async function openAudioDraftAssistant({ projectId: existingProjectId = null, songId = null, initialMode = null, onClose = () => {} } = {}) {
   if (document.getElementById('audio-draft-assistant')) return;
   cacheOptionalAudioTools().catch(() => {});
+  const shellEmbedded = window.parent !== window;
+  const announceMediaSourceChange = () => {
+    if (shellEmbedded) window.parent.postMessage({ type: 'stageprompter:active-media-changed' }, window.location.origin);
+  };
   let selectedFile = null;
   let decoded = null;
   let waveform = [];
@@ -225,6 +229,7 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
   const editMode = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Escritura y calibración');
   const stageMode = el('button', { type: 'button', className: 'btn-secondary', disabled: 'true' }, 'Escenario');
   const dialog = el('main', { id: 'audio-draft-assistant', className: 'sound-lab', 'aria-labelledby': 'audio-draft-heading' });
+  dialog.dataset.shellEmbedded = String(shellEmbedded);
   const heading = el('h1', { id: 'audio-draft-heading' }, 'Laboratorio del sonido');
   const form = el('div', { className: 'audio-draft-form' });
   const fileLabel = el('label', { for: 'audio-draft-file' }, 'Archivo de audio o video'); fileLabel.append(file);
@@ -809,12 +814,17 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     multitrackView.restoreState({ stems: [], loop: { bpm: Number(bpm.value) || 120, loopStartMs: 0, loopEndMs: 0, loopEnabled: true, positionMs: 0, tracks: [] } });
     analysisPanel.replaceChildren(el('div', { className: 'lab-empty-map' }, 'Carga una pista y pulsa «Analizar archivo» para construir el mapa del sonido.'));
     mediaPreview.replaceChildren(); mediaPlayer = null;
+    announceMediaSourceChange();
     if (mediaUrl) URL.revokeObjectURL(mediaUrl);
     if (!selectedFile) { saveLab.disabled = true; multitrackView.setSource(); return; }
     mediaUrl = URL.createObjectURL(selectedFile);
     mediaPlayer = document.createElement(selectedFile.type.startsWith('video/') ? 'video' : 'audio');
-    mediaPlayer.controls = true; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
+    mediaPlayer.controls = !shellEmbedded; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
     mediaPreview.append(mediaPlayer);
+    // The E2b shell hides native controls and owns playback. Explicitly start
+    // metadata loading so its global transport gets the new duration at once.
+    mediaPlayer.load();
+    announceMediaSourceChange();
     transportStatus.textContent = `Pista lista: ${selectedFile.name}`;
     title.value = selectedFile.name.replace(/\.[^.]+$/, '').slice(0, 200);
     preview.textContent = `${selectedFile.name} · ${(selectedFile.size / 1024 / 1024).toFixed(1)} MiB`;
@@ -1137,8 +1147,10 @@ export async function openAudioDraftAssistant({ projectId: existingProjectId = n
     selectedFile = new File([asset.blob], asset.name || fallbackName, { type: asset.mime || asset.blob.type });
     mediaUrl = URL.createObjectURL(asset.blob);
     mediaPlayer = document.createElement((asset.mime || '').startsWith('video/') ? 'video' : 'audio');
-    mediaPlayer.controls = true; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
+    mediaPlayer.controls = !shellEmbedded; mediaPlayer.preload = 'metadata'; mediaPlayer.src = mediaUrl;
     mediaPreview.append(mediaPlayer);
+    mediaPlayer.load();
+    announceMediaSourceChange();
     transportStatus.textContent = `Pista local recuperada: ${selectedFile.name}`;
   }
   if (existingProjectId) {

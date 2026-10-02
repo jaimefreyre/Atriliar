@@ -249,10 +249,14 @@ export function createMultitrackWorkspace({
   const separateButton = element('button', 'multi-button is-primary', 'Separar con IA local'); separateButton.type = 'button';
   sourceActions.append(modelSelect, separateButton, addOriginal);
   const separatorStatus = element('p', 'multi-status', 'Comprobando si Demucs está instalado…'); separatorStatus.setAttribute('role', 'status');
+  separatorStatus.dataset.state = 'checking';
+  const separationProgress = element('progress', 'multi-progress');
+  separationProgress.max = 100; separationProgress.value = 0; separationProgress.hidden = true;
+  separationProgress.setAttribute('aria-label', 'Progreso de separación de audio');
   const setupDetails = element('details', 'multi-setup');
   setupDetails.append(element('summary', '', 'Instalar el separador local'), element('p', '', 'La separación usa un modelo grande y puede descargar sus pesos la primera vez. Instálalo en el equipo con Python:'));
   const setupCode = element('code', '', 'python -m pip install -U demucs'); setupDetails.append(setupCode);
-  sourceCard.append(sourceMeta, sourceAudio, sourceActions, separatorStatus, setupDetails);
+  sourceCard.append(sourceMeta, sourceAudio, sourceActions, separatorStatus, separationProgress, setupDetails);
   const importCard = element('section', 'multi-card multi-import-card');
   importCard.append(element('h3', '', 'Importar pistas separadas'));
   importCard.append(element('p', 'multi-muted', 'Si ya tienes stems, impórtalos juntos. Se reconocen nombres como voz, bajo, guitarra, batería, piano y other.'));
@@ -273,6 +277,13 @@ export function createMultitrackWorkspace({
   rangeCard.append(rangeControls);
   const stemList = element('div', 'multi-stem-list');
   audioPanel.append(sourceCard, importCard, rangeCard, element('h3', 'multi-section-title', 'Pistas disponibles'), stemList);
+
+  function setSeparationStatus(message, state = 'info', progress = null) {
+    separatorStatus.textContent = message;
+    separatorStatus.dataset.state = state;
+    separationProgress.hidden = !Number.isFinite(progress);
+    if (Number.isFinite(progress)) separationProgress.value = Math.max(0, Math.min(100, progress));
+  }
 
   function refreshSource() {
     const file = sourceFile();
@@ -298,16 +309,16 @@ export function createMultitrackWorkspace({
     if (sourceAudio.getAttribute('src') !== nextUrl) sourceAudio.src = nextUrl;
   }
 
-  async function checkSeparation() {
+  async function checkSeparation({ preserveStatus = false } = {}) {
     try {
       const result = await fetch('/api/separation/status').then((response) => response.json());
       separationAvailable = Boolean(result.available);
-      separatorStatus.textContent = result.message || (result.available ? 'Demucs listo.' : 'Separador no disponible.');
+      if (!preserveStatus) setSeparationStatus(result.message || (result.available ? 'Demucs listo.' : 'Separador no disponible.'), result.available ? 'ready' : 'unavailable');
       separateButton.disabled = !result.available || !sourceFile() || separationBusy;
       setupDetails.hidden = Boolean(result.available);
     } catch {
       separationAvailable = false;
-      separatorStatus.textContent = 'El servidor local no ofrece el separador. Puedes importar stems ya separados.';
+      if (!preserveStatus) setSeparationStatus('El servidor local no ofrece el separador. Puedes importar pistas ya separadas.', 'error');
       separateButton.disabled = true; setupDetails.hidden = false;
     }
   }
@@ -316,7 +327,8 @@ export function createMultitrackWorkspace({
     const file = sourceFile();
     if (!file || separationBusy) return;
     separationBusy = true; separateButton.disabled = true; modelSelect.disabled = true;
-    separatorStatus.textContent = 'Subiendo el audio al separador local…';
+    let loadedCount = 0;
+    setSeparationStatus('Subiendo el audio al separador local…', 'loading');
     try {
       const response = await fetch(`/api/separate?model=${encodeURIComponent(modelSelect.value)}&name=${encodeURIComponent(file.name)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
@@ -325,41 +337,57 @@ export function createMultitrackWorkspace({
       if (!response.ok) throw new Error(job.error || 'No se pudo iniciar la separación.');
       let current = job;
       while (current.status !== 'completed' && current.status !== 'failed') {
-        separatorStatus.textContent = current.message || 'Separando las pistas en este equipo…';
+        if (current.status === 'processing' && Number.isFinite(Number(current.progress))) {
+          setSeparationStatus(`Separando con IA local · ${Math.round(current.progress)}%`, 'loading', Math.round(current.progress * .95));
+        } else setSeparationStatus(current.message || 'Separando las pistas en este equipo…', 'loading');
         await new Promise((resolve) => setTimeout(resolve, 1500));
-        current = await fetch(`/api/separate/${job.id}`).then((result) => result.json());
+        const statusResponse = await fetch(`/api/separate/${job.id}`);
+        const statusBody = await statusResponse.json();
+        if (!statusResponse.ok) throw new Error(statusBody.error || 'Se perdió el estado de la separación local.');
+        current = statusBody;
       }
       if (current.status === 'failed') throw new Error(current.message || 'La separación no pudo terminar.');
+      if (!Array.isArray(current.stems) || !current.stems.length) throw new Error('La separación terminó, pero el servidor no devolvió pistas de audio.');
       for (const separated of current.stems || []) {
+        const savingProgress = 95 + Math.round(loadedCount / current.stems.length * 5);
+        setSeparationStatus(`Guardando pista ${loadedCount + 1} de ${current.stems.length}: ${labelForStem(separated.name)}…`, 'loading', savingProgress);
         const blob = await fetch(separated.url).then((result) => {
-          if (!result.ok) throw new Error(`No se pudo recuperar la pista ${separated.name}.`);
+          if (!result.ok) throw new Error(`No se pudo recuperar la pista ${labelForStem(separated.name)} del separador local.`);
           return result.blob();
         });
         const key = separated.name;
         await storeStem(blob, labelForStem(key), key, Number(getAnalysis()?.durationMs) || await estimateDuration(blob), 'demucs');
+        loadedCount += 1;
+        setSeparationStatus(`Pista ${loadedCount} de ${current.stems.length} guardada: ${labelForStem(key)}.`, 'loading', 95 + Math.round(loadedCount / current.stems.length * 5));
       }
-      separatorStatus.textContent = `${current.message || 'Pistas separadas y guardadas.'} Se cargaron ${current.stems?.length || 0} pistas en la loopera.`;
+      setSeparationStatus(`${current.message || 'Pistas separadas y guardadas.'} ${loadedCount} pistas listas abajo; también quedaron preparadas en Loopera.`, 'success', 100);
       setupDetails.hidden = true;
-      onOpenLooper();
+      stemList.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
-      separatorStatus.textContent = error.message || 'No se pudo separar el audio.';
-      setupDetails.hidden = false;
+      const partial = loadedCount ? ` Se guardaron ${loadedCount} pistas antes del error; están disponibles abajo.` : '';
+      setSeparationStatus(`${error.message || 'No se pudo separar el audio.'}${partial}`, 'error');
+      setupDetails.hidden = separationAvailable;
     } finally {
       separationBusy = false; modelSelect.disabled = false; separateButton.disabled = !separationAvailable || !sourceFile();
-      checkSeparation();
+      checkSeparation({ preserveStatus: true });
     }
   }
   separateButton.addEventListener('click', separateSource);
   importInput.addEventListener('change', async () => {
     const files = [...(importInput.files || [])];
+    let importedCount = 0;
+    const importErrors = [];
     for (const file of files) {
       const key = stemKey(file.name), duration = Number(getAnalysis()?.durationMs) || await estimateDuration(file);
-      try { await storeStem(file, labelForStem(key, file.name.replace(/\.[^.]+$/, '')), key, duration, 'import'); }
-      catch (error) { separatorStatus.textContent = `No se pudo guardar ${file.name}: ${error.message}`; }
+      try {
+        await storeStem(file, labelForStem(key, file.name.replace(/\.[^.]+$/, '')), key, duration, 'import');
+        importedCount += 1;
+      } catch (error) { importErrors.push(`${file.name}: ${error.message}`); }
     }
     if (files.length) {
-      separatorStatus.textContent = `${files.length} pista${files.length === 1 ? '' : 's'} añadida${files.length === 1 ? '' : 's'} automáticamente a la loopera.`;
-      onOpenLooper();
+      if (importErrors.length) setSeparationStatus(`${importedCount} de ${files.length} pistas añadidas. Error: ${importErrors.join(' · ')}`, 'error');
+      else setSeparationStatus(`${importedCount} pista${importedCount === 1 ? '' : 's'} añadida${importedCount === 1 ? '' : 's'} y lista${importedCount === 1 ? '' : 's'} abajo; también disponible${importedCount === 1 ? '' : 's'} en Loopera.`, 'success');
+      if (importedCount) stemList.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     importInput.value = '';
   });

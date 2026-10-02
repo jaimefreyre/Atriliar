@@ -5,6 +5,7 @@ import { renderAsciiTab } from '../rendering/tabRenderer.js';
 import { SCALES } from '../music/scales.js';
 import { createHarmonicCircle } from './harmonicCircle.js';
 import { extractMidiVoices, midiRegisterFor, selectMidiPlaybackEvents } from '../audio/midiVoices.js';
+import { pitchReadingAt } from '../audio/pitchTuner.js';
 import { editAnalysisHarmony, setAnalysisSensitivity } from '../harmony/analysisHarmony.js';
 
 const ALTERNATIVE_REASONS = { 'otra-raiz': 'otra raíz', color: 'color', 'mismas-notas': 'mismas notas', bajo: 'otro bajo' };
@@ -84,14 +85,47 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   toolbar.append(beatViewLabel);
   root.append(toolbar);
 
+  const signalSummary = node('dl', 'analysis-signal-summary');
+  signalSummary.setAttribute('aria-label', 'Mediciones globales de la señal analizada');
+  function renderSignalSummary() {
+    const frames = analysis.spectralFrames || [];
+    const regions = analysis.harmonicRegions || [];
+    const silentFrames = frames.filter((frame) => frame.isSilence).length;
+    const rms = frames.map((frame) => Number(frame.rms)).filter((value) => Number.isFinite(value) && value >= 0);
+    const rmsMean = rms.length ? Math.sqrt(rms.reduce((sum, value) => sum + value * value, 0) / rms.length) : 0;
+    const dbfs = rmsMean > 0 ? `${(20 * Math.log10(rmsMean)).toFixed(1)} dBFS` : 'sin señal';
+    const duration = Math.max(0, Math.floor((analysis.durationMs || 0) / 1000));
+    const tempo = Number.isFinite(analysis.bpm) && analysis.bpm > 0
+      ? `${analysis.bpm.toFixed(1)} BPM · puntaje rítmico ${Number(analysis.rhythmConfidence || 0).toFixed(2)}`
+      : 'sin estimar';
+    const values = [
+      ['Duración', `${Math.floor(duration / 60)}:${String(duration % 60).padStart(2, '0')}`],
+      ['Tempo estimado', tempo],
+      ['Pulsos', String(analysis.beats?.length || 0)],
+      ['Tramos analizados', String(regions.length)],
+      ['Silencio detectado', frames.length ? `${Math.round(silentFrames / frames.length * 100)}%` : 'sin medir'],
+      ['Nivel RMS medio · dBFS', dbfs],
+      ['Muestreo del análisis', `${((analysis.sampleRate || 44100) / 1000).toFixed(1)} kHz`],
+    ];
+    signalSummary.replaceChildren(...values.map(([label, value]) => {
+      const metric = node('div', 'analysis-signal-metric');
+      const term = node('dt', '', label);
+      const description = node('dd', '', value);
+      metric.append(term, description);
+      return metric;
+    }));
+  }
+  renderSignalSummary();
+  root.append(signalSummary);
+
   const panelControls = node('nav', 'analysis-panel-controls');
   panelControls.setAttribute('aria-label', 'Herramientas visibles del análisis');
   const panelDefinitions = [
     ['segments', 'Tramos'], ['detail', 'Evidencia'], ['instruments', 'Instrumentos'], ['voices', 'Líneas MIDI'], ['circle', 'Círculo de quintas'], ['sections', 'Estructura'],
   ];
   const panelButtons = new Map();
-  const panelPrefsKey = 'stageprompter:analysis-panels:v1';
-  const defaultPanelState = { segments: true, detail: true, instruments: true, voices: true, circle: true, sections: true };
+  const panelPrefsKey = 'stageprompter:analysis-panels:v2';
+  const defaultPanelState = { segments: true, detail: true, instruments: true, voices: false, circle: false, sections: false };
   let savedPanelState = {};
   try { savedPanelState = JSON.parse(localStorage.getItem(panelPrefsKey) || '{}') || {}; } catch { savedPanelState = {}; }
   const panelState = { ...defaultPanelState, ...savedPanelState };
@@ -139,6 +173,9 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   const harmonicHistoryHost = node('div', 'harmonic-history-host');
 
   let selectedIndex = 0;
+  let tunerRegister = 'auto';
+  let tunerTracks = null;
+  let updatePitchTuner = () => {};
   let activeChordSelect = null;
   let harmonicVisualization = null;
   let playbackPositionMs = 0;
@@ -171,6 +208,11 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
   function getSegments() {
     if (beatView.checked) return analysis.chordCandidates || [];
     return analysis.harmonicRegions?.length ? analysis.harmonicRegions : analysis.chordCandidates || [];
+  }
+  function getTunerTracks() {
+    tunerTracks ||= extractMidiVoices(analysis.spectralFrames || [], { startMs: 0, endMs: analysis.durationMs,
+      waveform: analysis.waveform || [], durationMs: analysis.durationMs });
+    return tunerTracks;
   }
   const indexAt = (timeMs) => Math.max(0, getSegments().findIndex((item) => item.startMs <= timeMs && item.endMs > timeMs));
 
@@ -425,6 +467,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     const tick = (now) => {
       if (!midiPlaybackClock) return;
       playbackPositionMs = Math.min(endMs, midiPlaybackClock.startMs + (now - midiPlaybackClock.startedAt) * midiPlaybackClock.rate);
+      updatePitchTuner();
       const parts = getSegments();
       const active = parts.find((part) => playbackPositionMs >= part.startMs && playbackPositionMs < part.endMs) || parts[selectedIndex];
       const activeIndex = parts.indexOf(active);
@@ -908,6 +951,53 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     detail.append(controls);
 
     const graph = node('div', 'analysis-detail-grid');
+    const tuner = node('section', 'analysis-detail-card analysis-tuner-card');
+    tuner.setAttribute('aria-label', 'Afinador del audio en la posición del cursor');
+    const tunerHead = node('div', 'analysis-tuner-head');
+    tunerHead.append(node('strong', '', 'Afinador de pista'));
+    const registerLabel = node('label', 'analysis-tuner-register-label', 'Registro ');
+    const registerSelect = node('select', 'analysis-tuner-register');
+    [['auto', 'Auto'], ['bass', 'Bajo'], ['middle', 'Medio'], ['high', 'Agudo']].forEach(([value, labelText]) => {
+      const option = node('option', '', labelText); option.value = value; registerSelect.append(option);
+    });
+    registerSelect.value = tunerRegister;
+    registerSelect.setAttribute('aria-label', 'Registro para seguir con el afinador');
+    registerSelect.addEventListener('change', () => { tunerRegister = registerSelect.value; updatePitchTuner(); });
+    registerLabel.append(registerSelect); tunerHead.append(registerLabel);
+    const tunerReadout = node('div', 'analysis-tuner-readout');
+    const tunerNote = node('strong', 'analysis-tuner-note', '—');
+    const tunerInfo = node('span', 'analysis-tuner-info', 'Esperando lectura');
+    tunerReadout.append(tunerNote, tunerInfo);
+    const tunerGauge = node('div', 'analysis-tuner-gauge');
+    tunerGauge.setAttribute('role', 'meter'); tunerGauge.setAttribute('aria-label', 'Desviación de afinación desde menos 50 hasta más 50 cents');
+    tunerGauge.setAttribute('aria-valuemin', '-50'); tunerGauge.setAttribute('aria-valuemax', '50');
+    const tunerNeedle = node('span', 'analysis-tuner-needle'); tunerNeedle.setAttribute('aria-hidden', 'true');
+    tunerGauge.append(tunerNeedle);
+    const tunerTicks = node('div', 'analysis-tuner-ticks');
+    ['−50', '−25', '0', '+25', '+50 cents'].forEach((labelText) => tunerTicks.append(node('span', '', labelText)));
+    const tunerHint = node('small', 'analysis-tuner-hint', 'La nota sigue el cursor; elige Bajo, Medio o Agudo para aislar una línea.');
+    tuner.append(tunerHead, tunerReadout, tunerGauge, tunerTicks, tunerHint);
+    updatePitchTuner = () => {
+      const activeSegment = getSegments().find((part) => playbackPositionMs >= part.startMs && playbackPositionMs < part.endMs);
+      const reading = pitchReadingAt({ tracks: getTunerTracks(), frames: analysis.spectralFrames || [],
+        timeMs: playbackPositionMs, register: tunerRegister, silence: Boolean(activeSegment?.isSilence) });
+      if (!reading || reading.kind !== 'note') {
+        tunerNote.textContent = '—';
+        tunerInfo.textContent = `${timeLabel(playbackPositionMs)} · ${reading?.kind === 'silence' ? 'Silencio · sin nota que afinar' : 'Sin nota estable en este instante'}`;
+        tunerGauge.dataset.active = 'false'; tunerGauge.setAttribute('aria-valuenow', '0'); tunerGauge.setAttribute('aria-valuetext', 'Sin nota estable');
+        tunerNeedle.style.left = '50%';
+        return;
+      }
+      const cents = Math.round(reading.cents);
+      const centsLabel = `${cents > 0 ? '+' : ''}${cents} cents`;
+      const registerName = { bass: 'Bajo', middle: 'Medio', high: 'Agudo' }[reading.register] || 'Nota';
+      tunerNote.textContent = reading.note;
+      tunerInfo.textContent = `${timeLabel(playbackPositionMs)} · ${reading.frequencyHz.toFixed(1)} Hz · ${centsLabel} · ${registerName} · pico ${Math.round(reading.strength * 100)}%`;
+      tunerGauge.dataset.active = 'true'; tunerGauge.setAttribute('aria-valuenow', String(Math.max(-50, Math.min(50, cents))));
+      tunerGauge.setAttribute('aria-valuetext', `${reading.note}, ${centsLabel}`);
+      tunerNeedle.style.left = `${Math.max(0, Math.min(100, 50 + cents))}%`;
+    };
+    graph.append(tuner);
     const comparison = node('section', 'analysis-detail-card analysis-chord-comparison');
     comparison.append(node('strong', '', segment.isSilence
       ? 'Huella del tramo · silencio detectado'
@@ -987,6 +1077,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       chromaPanel.append(row);
     });
     graph.append(spectralPanel, chromaPanel); detail.append(graph);
+    updatePitchTuner();
 
     if (detailOnly) { restoreScroll(); return; }
     const section = getSection(segment.startMs);
@@ -1081,6 +1172,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
     const at = getSegments()[selectedIndex]?.startMs ?? playbackPositionMs;
     setAnalysisSensitivity(analysis, sensitivity.value);
     selectedIndex = indexAt(at);
+    renderSignalSummary();
     onChange();
     renderDetail();
   });
@@ -1109,6 +1201,7 @@ export function createAudioAnalysisVisualizer({ analysis, onChange = () => {}, o
       updateSelectionButtons();
     }
     const activeSegment = segments[index] || segments[selectedIndex];
+    updatePitchTuner();
     harmonicVisualization?.update(activeSegment, playbackPositionMs, liveFrame);
     midiVoiceState?.setPlayhead?.(activeSegment, playbackPositionMs);
     refreshSpectralOverlay();

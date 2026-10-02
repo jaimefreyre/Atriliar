@@ -120,7 +120,7 @@ export function buildSpectralTrace(frames) {
     const maximum = frame.spectralPeaks[0]?.magnitude || 1;
     return { timeMs: Math.round(frame.timeSec * 1000), rms: frame.rms || 0, isSilence: frame.isSilence,
       level: Math.sqrt(Math.max(0, frame.rms || 0) / maxRms),
-      peaks: frame.spectralPeaks.slice(0, 24).map((peak) => ({ midi: peak.midi, note: peak.note, frequencyHz: Math.round(peak.frequencyHz),
+      peaks: frame.spectralPeaks.slice(0, 24).map((peak) => ({ midi: peak.midi, note: peak.note, frequencyHz: Math.round(peak.frequencyHz * 10) / 10,
         strength: Math.round((peak.magnitude / maximum) * 1000) / 1000 })) };
   });
 }

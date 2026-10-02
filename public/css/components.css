@@ -208,6 +208,8 @@
   .sp-dock__time { font-variant-numeric: tabular-nums; font-size: var(--text-sm); color: var(--color-text-secondary); min-inline-size: 7.5rem; }
   .sp-dock__time strong { color: var(--color-text); font-weight: var(--weight-strong); }
   .sp-dock__scrub { flex: 1; min-inline-size: 8rem; }
+  .sp-dock__volume-group { flex-wrap: nowrap; }
+  .sp-dock__volume { inline-size: clamp(4rem, 7vw, 6rem); flex: 0 1 auto; }
   .sp-range { inline-size: 100%; accent-color: var(--color-now); }
 
   /* ---------- Popovers and dialogs ---------- */
